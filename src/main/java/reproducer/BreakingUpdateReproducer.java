@@ -82,48 +82,178 @@ public class BreakingUpdateReproducer {
     public void reproduce(BreakingUpdate bu) throws InterruptedException {
         createBaseImageForBreakingUpdate(bu);
         Map<String, String> startedContainers = new HashMap<>();
-        boolean isPrevBuildSuccessful = false;
-        int prevAttemptCount;
-        // Try running tests 3 times for the previous commit to ensure that the build is reproducible.
-        for (prevAttemptCount = 1; prevAttemptCount < 4; prevAttemptCount++) {
-            log.info("Attempting for the {} time to compile and test the previous commit of breaking update {}",
-                    prevAttemptCount, bu.breakingCommit);
-            startedContainers.put("prevContainer%s".formatted(prevAttemptCount), startContainer(bu, getPrevCmd(bu)));
-            WaitContainerResultCallback result = client.waitContainerCmd(startedContainers.get("prevContainer%s"
-                            .formatted(prevAttemptCount)))
-                    .exec(new WaitContainerResultCallback());
-            if (result.awaitStatusCode().intValue() != EXIT_CODE_OK) {
-                log.info("Build failed for the previous commit of {} in the {} attempt.", bu.breakingCommit, prevAttemptCount);
-                break;
-            } else {
-                if (prevAttemptCount > 2) {
-                    isPrevBuildSuccessful = true;
-                }
+
+        int prevAttemptCount = reproducibleSuccess(bu, startedContainers, true);
+
+        if (prevAttemptCount == -1) {
+            // try having a reproducible failure
+
+            prevAttemptCount = reproducibleFailure(bu, startedContainers, true);
+
+            if(prevAttemptCount == -1) {
+                // no pre reproducibility
+                resultManager.saveUnsuccessfulReproductionResult(bu);
+                removeContainers(bu, startedContainers.values());
+                removeImages(bu, List.of("base"));
+                return;
             }
-        }
-        if (!isPrevBuildSuccessful) {
-            resultManager.saveUnsuccessfulReproductionResult(bu);
+
+            // we have a consistent pre failure.
+
+            int attemptCount = reproducibleSuccess(bu, startedContainers, true);
+            if(attemptCount == -1) {
+                // try having reproducible succes
+
+                attemptCount = reproducibleFailure(bu, startedContainers, true);
+                if(attemptCount == -1) {
+                    // no post reproducibility
+                    resultManager.saveUnsuccessfulReproductionResult(bu);
+                    removeContainers(bu, startedContainers.values());
+                    removeImages(bu, List.of("base"));
+                    return;
+                }
+
+                // we have reproducible pre failure and post failure
+
+
+                startedContainers.put("postCommit",
+                        createImageForCommit(bu, startedContainers.get("postContainer%s".formatted(attemptCount - 1)),
+                                "post"));
+                startedContainers.put("prevCommit",
+                        createImageForCommit(bu, startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1)),
+                                "pre"));
+
+                // todo make this result formate different from a breakingchange
+                resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"));
+                removeContainers(bu, startedContainers.values());
+                removeImages(bu, List.of("base", "pre", "post"));
+                return;
+            }
+
+            // we have reproducible pre failure and post succes, aka unbreaking change
+
+
+            startedContainers.put("postCommit",
+                    createImageForCommit(bu, startedContainers.get("postContainer%s".formatted(attemptCount - 1)),
+                            "post"));
+            startedContainers.put("prevCommit",
+                    createImageForCommit(bu, startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1)),
+                            "pre"));
+
+            // todo make this result formate different from a breakingchange
+            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"));
             removeContainers(bu, startedContainers.values());
-            removeImages(bu, List.of("base"));
+            removeImages(bu, List.of("base", "pre", "post"));
             return;
         }
 
-        boolean isBuildSuccessfullyFailed = false;
+
+        int attemptCount = reproducibleSuccess(bu, startedContainers,  false);
+
+        if (attemptCount == -1) {
+            // try having a reproduicble succes
+
+            attemptCount = reproducibleSuccess(bu, startedContainers, false);
+
+            if(attemptCount == -1) {
+                // no post reproducibility
+
+                resultManager.saveUnsuccessfulReproductionResult(bu);
+                removeContainers(bu, startedContainers.values());
+                removeImages(bu, List.of("base"));
+                return;
+            }
+
+            // we have a consistent succes
+
+            startedContainers.put("postCommit",
+                    createImageForCommit(bu, startedContainers.get("postContainer%s".formatted(attemptCount - 1)),
+                            "post"));
+            startedContainers.put("prevCommit",
+                    createImageForCommit(bu, startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1)),
+                            "pre"));
+
+            // todo make this result formate different from a breakingchange
+            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"));
+            removeContainers(bu, startedContainers.values());
+            removeImages(bu, List.of("base", "pre", "post"));
+            return;
+        }
+
+
+        // this is a breaking change
+
+        startedContainers.put("postCommit",
+                createImageForCommit(bu, startedContainers.get("postContainer%s".formatted(attemptCount - 1)),
+                        "post"));
+        startedContainers.put("prevCommit",
+                createImageForCommit(bu, startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1)),
+                        "pre"));
+        resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"));
+        removeContainers(bu, startedContainers.values());
+        removeImages(bu, List.of("base", "pre", "post"));
+    }
+
+    private int reproducibleSuccess(BreakingUpdate bu, Map<String, String> startedContainers, boolean isPre){
+        boolean isBuildSuccessful = false;
         int attemptCount;
+
+        // make a lambda that represents getPrevCMd or getPostCmd based on the preOrPost parameter
+        String containerCommand = isPre ? getPrevCmd(bu) : getPostCmd(bu);
+        String containerName = isPre ? "prevContainer%s" : "postContainer%s";
+
+        String preOrPost = isPre ? "previous" : "post";
+
+        // Try running tests 3 times for the previous commit to ensure that the build is reproducible.
+        for (attemptCount = 1; attemptCount < 4; attemptCount++) {
+            log.info("Attempting for the {} time to compile and test if the {} commit of breaking update {} is successful",
+                    attemptCount, preOrPost, bu.breakingCommit);
+            startedContainers.put(containerName.formatted(attemptCount), startContainer(bu, containerCommand));
+            WaitContainerResultCallback result = client.waitContainerCmd(startedContainers.get(containerName
+                            .formatted(attemptCount)))
+                    .exec(new WaitContainerResultCallback());
+            if (result.awaitStatusCode().intValue() != EXIT_CODE_OK) {
+                log.info("Build failed for the {} commit of {} in the {} attempt.", preOrPost, bu.breakingCommit, attemptCount);
+                break;
+            } else {
+                if (attemptCount > 2) {
+                    isBuildSuccessful = true;
+                }
+            }
+        }
+
+        if (!isBuildSuccessful) {
+            return -1;
+        }
+
+        return attemptCount;
+    }
+
+    private int reproducibleFailure(BreakingUpdate bu, Map<String, String> startedContainers,  boolean isPre) {
+        int attemptCount;
+        boolean isBuildSuccessfullyFailed = false;
         ReproducibleBreakingUpdate.FailureCategory prevFailure = null;
         ReproducibleBreakingUpdate.FailureCategory newFailure;
+
+        String containerCommand = isPre ? getPrevCmd(bu) : getPostCmd(bu);
+        String containerName = isPre ? "prevContainer%s" : "postContainer%s";
+
+        String preOrPost = isPre ? "previous" : "post";
+
         // Try running tests 3 times to ensure that the breakage is reproducible.
         for (attemptCount = 1; attemptCount < 4; attemptCount++) {
-            log.info("Attempting for the {} time to compile and test breaking update {}", attemptCount, bu.breakingCommit);
-            startedContainers.put("postContainer%s".formatted(attemptCount), startContainer(bu, getPostCmd(bu)));
-            WaitContainerResultCallback result = client.waitContainerCmd(startedContainers.get("postContainer%s"
+            log.info("Attempting for the {} time to compile and test failure of {} update {}", attemptCount, preOrPost, bu.breakingCommit);
+
+            startedContainers.put(containerName.formatted(attemptCount), startContainer(bu, containerCommand));
+            WaitContainerResultCallback result = client.waitContainerCmd(startedContainers.get(containerName
                     .formatted(attemptCount))).exec(new WaitContainerResultCallback());
+
             if (result.awaitStatusCode().intValue() != EXIT_CODE_OK) {
                 newFailure = resultManager.getFailure(bu,
-                        startedContainers.get("postContainer%s".formatted(attemptCount)), true);
+                        startedContainers.get(containerName.formatted(attemptCount)), true);
                 if (attemptCount == 1) {
                     prevFailure = resultManager.getFailure(bu,
-                            startedContainers.get("postContainer%s".formatted(attemptCount)), true);
+                            startedContainers.get(containerName.formatted(attemptCount)), true);
                 }
                 else if (!newFailure.equals(prevFailure)) {
                     log.info("Build has failed due to a different reason in the {} attempt than in the previous attempt."
@@ -140,21 +270,12 @@ public class BreakingUpdateReproducer {
                 break;
             }
         }
-        if (isBuildSuccessfullyFailed) {
-            startedContainers.put("postCommit",
-                    createImageForCommit(bu, startedContainers.get("postContainer%s".formatted(attemptCount - 1)),
-                            "post"));
-            startedContainers.put("prevCommit",
-                    createImageForCommit(bu, startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1)),
-                            "pre"));
-            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"));
-            removeContainers(bu, startedContainers.values());
-            removeImages(bu, List.of("base", "pre", "post"));
-            return;
+
+        if (!isBuildSuccessfullyFailed) {
+            return -1;
         }
-        resultManager.saveUnsuccessfulReproductionResult(bu);
-        removeContainers(bu, startedContainers.values());
-        removeImages(bu, List.of("base"));
+
+        return attemptCount;
     }
 
     /** Remove the containers created during the reproduction of the breaking update */
