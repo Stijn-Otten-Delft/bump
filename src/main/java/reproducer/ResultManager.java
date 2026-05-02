@@ -259,16 +259,15 @@ public class ResultManager {
      * Save breaking update JSON data in unsuccessful-reproductions dir when the reproduction is unsuccessful.
      */
     public void saveUnsuccessfulReproductionResult(BreakingUpdate bu) {
-        UnreproducibleBreakingUpdate unreproducibleBU = new UnreproducibleBreakingUpdate(bu.url, bu.project, bu.projectOrganisation,
-                bu.breakingCommit, bu.prAuthor, bu.preCommitAuthor, bu.breakingCommitAuthor, bu.updatedDependency, bu.licenseInfo);
-        unreproducibleBU.setJavaVersionUsedForReproduction();
+        var unreproducibleDU = new UnreproducibleDependencyUpdate(bu);
+
         // Delete the BreakingUpdateJSON data from the in-progress-reproductions directory.
         removeBreakingUpdateFile(bu);
         log.info("Saving the JSON file containing an unreproducible breaking update {} in unsuccessful-reproductions " +
-                "dir.", unreproducibleBU.breakingCommit);
+                "dir.", unreproducibleDU.breakingCommit);
         // Update breaking update file.
-        JsonUtils.writeToFile(unsuccessfulReproductionDir.resolve(unreproducibleBU.breakingCommit +
-                JsonUtils.JSON_FILE_ENDING), unreproducibleBU);
+        JsonUtils.writeToFile(unsuccessfulReproductionDir.resolve(unreproducibleDU.breakingCommit +
+                JsonUtils.JSON_FILE_ENDING), unreproducibleDU);
     }
 
     /**

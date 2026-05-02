@@ -69,8 +69,7 @@ public class BreakingUpdateReproducer {
                 BreakingUpdate bu = JsonUtils.readFromFile(breakingUpdate.toPath(), BreakingUpdate.class);
                 reproduce(bu);
             } catch (RuntimeException | InterruptedException e) {
-                log.error("An exception occurred while reproducing the breaking update in " +
-                        breakingUpdate.getName(), e);
+                log.error("An exception occurred while reproducing the breaking update in {}", breakingUpdate.getName(), e);
             }
         }
     }

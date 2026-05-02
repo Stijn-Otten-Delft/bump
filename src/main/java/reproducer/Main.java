@@ -119,11 +119,13 @@ public class Main {
         public void run() {
             try {
                 List<String> apiTokens = Files.readAllLines(apiTokenFile);
-                ResultManager.GitHubPackagesCredentials credentials = ResultManager.GitHubPackagesCredentials
-                        .fromJson(credentialsFile);
+                ResultManager.GitHubPackagesCredentials credentials = ResultManager.GitHubPackagesCredentials.fromJson(credentialsFile);
+
                 ResultManager resultManager = new ResultManager(apiTokens, benchmarkDir, unsuccessfulReproductionsDir,
                         notReproducedDataDir, logDir, jarDir, workflowDir, userDataDir, chromeDriverPath, credentials);
+
                 BreakingUpdateReproducer reproducer = new BreakingUpdateReproducer(resultManager);
+
                 if (breakingUpdateFile != null) {
                     BreakingUpdate bu = JsonUtils.readFromFile(breakingUpdateFile, BreakingUpdate.class);
                     reproducer.reproduce(bu);
