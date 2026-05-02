@@ -1,6 +1,6 @@
 package miner;
 
-public class UnreproducibleDependencyUpdate extends BreakingUpdate {
+public class UnreproducibleDependencyUpdate extends DependencyUpdate {
 
     private static final String DEFAULT_JAVA_VERSION_FOR_REPRODUCTION = "11";
     public String javaVersionUsedForReproduction;
@@ -11,17 +11,17 @@ public class UnreproducibleDependencyUpdate extends BreakingUpdate {
      */
     public UnreproducibleDependencyUpdate(String url, String project, String projectOrganisation, String breakingCommit,
                                           String prAuthor, String preCommitAuthor, String breakingCommitAuthor,
-                                          BreakingUpdate.UpdatedDependency updatedDependency, String licenseInfo) {
+                                          DependencyUpdate.UpdatedDependency updatedDependency, String licenseInfo) {
         super(url, project, projectOrganisation, breakingCommit, prAuthor, preCommitAuthor, breakingCommitAuthor, updatedDependency, licenseInfo);
     }
 
-    public UnreproducibleDependencyUpdate(BreakingUpdate bu){
-        super(bu.url, bu.project, bu.projectOrganisation, bu.breakingCommit, bu.prAuthor, bu.preCommitAuthor, bu.breakingCommitAuthor, bu.updatedDependency, bu.licenseInfo);
+    public UnreproducibleDependencyUpdate(DependencyUpdate bu){
+        super(bu.url, bu.project, bu.projectOrganisation, bu.postCommit, bu.prAuthor, bu.preCommitAuthor, bu.postCommitAuthor, bu.updatedDependency, bu.licenseInfo);
         this.javaVersionUsedForReproduction = DEFAULT_JAVA_VERSION_FOR_REPRODUCTION;
     }
 
-    public UnreproducibleDependencyUpdate(BreakingUpdate bu, String javaVersionUsedForReproduction){
-        super(bu.url, bu.project, bu.projectOrganisation, bu.breakingCommit, bu.prAuthor, bu.preCommitAuthor, bu.breakingCommitAuthor, bu.updatedDependency, bu.licenseInfo);
+    public UnreproducibleDependencyUpdate(DependencyUpdate bu, String javaVersionUsedForReproduction){
+        super(bu.url, bu.project, bu.projectOrganisation, bu.postCommit, bu.prAuthor, bu.preCommitAuthor, bu.postCommitAuthor, bu.updatedDependency, bu.licenseInfo);
         this.javaVersionUsedForReproduction = javaVersionUsedForReproduction;
     }
 

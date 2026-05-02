@@ -201,7 +201,7 @@ public class GitHubMiner {
                     .takeWhile(PullRequestFilters.createdBefore(cutoffDate).negate())
                     .filter(PullRequestFilters.changesOnlyDependencyVersionInPomXML)
                     .filter(PullRequestFilters.breaksBuild)
-                    .map(BreakingUpdate::new)
+                    .map(DependencyUpdate::new)
                     .forEach(breakingUpdate -> {
                         if (!breakingUpdate.updatedDependency.dependencyScope.equals("test")) {
                             writeBreakingUpdate(breakingUpdate);
@@ -214,9 +214,9 @@ public class GitHubMiner {
     /**
      * Create a json file containing information about a breaking update.
      */
-    public void writeBreakingUpdate(BreakingUpdate breakingUpdate) {
-        Path path = outputDirectory.resolve(breakingUpdate.breakingCommit + JsonUtils.JSON_FILE_ENDING);
-        JsonUtils.writeToFile(path, breakingUpdate);
+    public void writeBreakingUpdate(DependencyUpdate dependencyUpdate) {
+        Path path = outputDirectory.resolve(dependencyUpdate.postCommit + JsonUtils.JSON_FILE_ENDING);
+        JsonUtils.writeToFile(path, dependencyUpdate);
     }
 
     /**

@@ -1,7 +1,9 @@
 package reproducer;
 
-import miner.BreakingUpdate;
+import miner.DependencyUpdate;
+import miner.GitHubAPITokenQueue;
 import miner.JsonUtils;
+import org.jspecify.annotations.NonNull;
 import picocli.CommandLine;
 
 import java.io.File;
@@ -9,7 +11,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-
 /**
  * This class represents the main entry point to the breaking update reproducer.
  *
@@ -115,19 +116,20 @@ public class Main {
         )
         String chromeDriverPath;
 
+        @CommandLine.Option(
+                names = {"-np", "--no-push", "--dont-push"},
+                paramLabel = "DONT-PUSH",
+                description = "Set this flag if you do not want to push to a remote repo"
+        )
+        boolean noPush;
+
         @Override
         public void run() {
             try {
-                List<String> apiTokens = Files.readAllLines(apiTokenFile);
-                ResultManager.GitHubPackagesCredentials credentials = ResultManager.GitHubPackagesCredentials.fromJson(credentialsFile);
-
-                ResultManager resultManager = new ResultManager(apiTokens, benchmarkDir, unsuccessfulReproductionsDir,
-                        notReproducedDataDir, logDir, jarDir, workflowDir, userDataDir, chromeDriverPath, credentials);
-
-                BreakingUpdateReproducer reproducer = new BreakingUpdateReproducer(resultManager);
+                DependencyUpdateReproducer reproducer = getReproducer();
 
                 if (breakingUpdateFile != null) {
-                    BreakingUpdate bu = JsonUtils.readFromFile(breakingUpdateFile, BreakingUpdate.class);
+                    DependencyUpdate bu = JsonUtils.readFromFile(breakingUpdateFile, DependencyUpdate.class);
                     reproducer.reproduce(bu);
                 } else {
                     File[] breakingUpdates = notReproducedDataDir.toFile().listFiles();
@@ -138,6 +140,24 @@ public class Main {
             } catch (IOException | InterruptedException e) {
                 throw new RuntimeException(e);
             }
+        }
+
+        private @NonNull DependencyUpdateReproducer getReproducer() throws IOException {
+            List<String> apiTokens = Files.readAllLines(apiTokenFile);
+            GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
+
+            GitHubPackagesCredentials credentials = GitHubPackagesCredentials.fromJson(credentialsFile);
+
+            GitHubManager gitHubManager = noPush ? null : new GitHubManager(tokenQueue);
+
+            WorkflowLogFinder workflowLogFinder = new WorkflowLogFinder(tokenQueue, chromeDriverPath);
+            DependencyRefLinkFinder dependencyRefLinkFinder = new DependencyRefLinkFinder(tokenQueue);
+
+
+            ResultManager resultManager = new ResultManager(benchmarkDir, unsuccessfulReproductionsDir,
+                    notReproducedDataDir, logDir, jarDir, workflowDir, userDataDir, credentials, gitHubManager, !noPush, workflowLogFinder, dependencyRefLinkFinder);
+
+            return new DependencyUpdateReproducer(resultManager);
         }
     }
 }
