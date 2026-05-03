@@ -5,6 +5,7 @@ import miner.DependencyUpdate;
 import miner.GitHubAPITokenQueue;
 import miner.JsonUtils;
 import okhttp3.OkHttpClient;
+import org.jspecify.annotations.NonNull;
 import org.kohsuke.github.*;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
@@ -116,18 +117,7 @@ public class WorkflowLogFinder {
         if (System.getProperty("os.name").startsWith("Windows"))
             System.setProperty("webdriver.chrome.driver", chromeDriverPath);
 
-        ChromeOptions options = new ChromeOptions();
-        options.addArguments("--disable-extensions");
-        options.addArguments("--disable-gpu");
-        options.addArguments("--no-sandbox");
-
-        if (userDataDir != null)
-            options.addArguments("user-data-dir=%s".formatted(userDataDir));
-        Map<String, Object> prefs = new HashMap<>();
-        prefs.put("download.default_directory", downloadDirectory);
-        options.setExperimentalOption("prefs", prefs);
-
-        WebDriver driver = new ChromeDriver(options);
+        WebDriver driver = getWebDriver(downloadDirectory);
 
         try {
             driver.get(prUrl);
@@ -150,5 +140,20 @@ public class WorkflowLogFinder {
         } finally {
             driver.quit();
         }
+    }
+
+    private @NonNull WebDriver getWebDriver(String downloadDirectory) {
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--disable-extensions");
+        options.addArguments("--disable-gpu");
+        options.addArguments("--no-sandbox");
+
+        if (userDataDir != null)
+            options.addArguments("user-data-dir=%s".formatted(userDataDir));
+        Map<String, Object> prefs = new HashMap<>();
+        prefs.put("download.default_directory", downloadDirectory);
+        options.setExperimentalOption("prefs", prefs);
+
+        return new ChromeDriver(options);
     }
 }
