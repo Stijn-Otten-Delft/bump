@@ -101,8 +101,7 @@ public class Main {
         @CommandLine.Option(
                 names = {"-l", "--last"},
                 paramLabel = "LAST-DATE",
-                description = "Last date of search",
-                required = false
+                description = "Last date of search"
         )
         Date lastDate;
         @CommandLine.Option(

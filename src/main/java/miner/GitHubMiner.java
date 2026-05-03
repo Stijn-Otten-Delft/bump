@@ -36,7 +36,7 @@ public class GitHubMiner {
      */
     private static final File CACHE_DIR = Paths.get(System.getProperty("java.io.tmpdir")).toFile();
 
-    /** Default file name for the file containing found repositories" */
+    /** Default file name for the file containing found repositories */
     static final String FOUND_REPOS_FILE = "found_repositories.json";
     private final OkHttpClient httpConnector;
     private final GitHubAPITokenQueue tokenQueue;
@@ -105,7 +105,7 @@ public class GitHubMiner {
                         break;
                     }
                     repoList.add(repository);
-                    log.info("  Found " + repository.getUrl());
+                    log.info("  Found {}", repository.getUrl());
                 }
             }
             creationDate = creationDate.minusDays(1);
@@ -171,7 +171,7 @@ public class GitHubMiner {
                     try {
                         TimeUnit.SECONDS.sleep(60);
                     } catch (InterruptedException ex) {
-                        log.info("Failed to mine from "+repo);
+                        log.info("Failed to mine from {}", repo);
                     }
                 }
                 repoList.setCheckedTime(repo, Date.from(Instant.now()));
@@ -189,7 +189,7 @@ public class GitHubMiner {
      */
     private void mineRepo(String repo, Date cutoffDate) throws IOException {
         try {
-            log.info("Checking " + repo);
+            log.info("Checking {}", repo);
             GHRepository repository = tokenQueue.getGitHub(httpConnector).getRepository(repo);
             PagedIterator<GHPullRequest> pullRequests = repository.queryPullRequests()
                     .state(GHIssueState.ALL)
@@ -200,7 +200,7 @@ public class GitHubMiner {
             while (pullRequests.hasNext()) {
                 List<GHPullRequest> nextPage = pullRequests.nextPage();
                 if (PullRequestFilters.createdBefore(cutoffDate).test(nextPage.get(0))) {
-                    log.info("Checked all PRs for " + repo + " created after " + cutoffDate);
+                    log.info("Checked all PRs for {} created after {}", repo, cutoffDate);
                     break;
                 }
                 nextPage.stream()
@@ -211,7 +211,7 @@ public class GitHubMiner {
                         .forEach(breakingUpdate -> {
                             if (!breakingUpdate.updatedDependency.dependencyScope.equals("test")) {
                                 writeBreakingUpdate(breakingUpdate);
-                                log.info("    Found " + breakingUpdate.url);
+                                log.info("    Found {}", breakingUpdate.url);
                             }
                         });
             }

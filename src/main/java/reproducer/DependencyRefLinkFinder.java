@@ -46,9 +46,7 @@ public class DependencyRefLinkFinder {
         String repoOwner = bu.updatedDependency.dependencyGroupID.split("\\.").length > 1 ?
                 bu.updatedDependency.dependencyGroupID.split("\\.")[1] : bu.updatedDependency.dependencyGroupID;
         String repoName = repoOwner + "/" + bu.updatedDependency.dependencyArtifactID;
-        GHRepository repository = tokenQueue.getGitHub(httpConnector).getRepository(repoName);
-        return repository;
-
+        return tokenQueue.getGitHub(httpConnector).getRepository(repoName);
     }
 
     /**

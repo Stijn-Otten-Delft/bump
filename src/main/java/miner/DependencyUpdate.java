@@ -76,10 +76,10 @@ public class DependencyUpdate {
     DependencyUpdate(@JsonProperty("url") String url,
                      @JsonProperty("project") String project,
                      @JsonProperty("projectOrganisation") String organisation,
-                     @JsonProperty("breakingCommit") String postCommit, // still called breaking commit for compatibility with old BUMP
+                     @JsonProperty("postCommit") String postCommit,
                      @JsonProperty("prAuthor") String prAuthor,
                      @JsonProperty("preCommitAuthor") String preCommitAuthor,
-                     @JsonProperty("breakingCommitAuthor") String postCommitAuthor, // still called breakingCommitAuthor for compatibility with old BUMP
+                     @JsonProperty("postCommitAuthor") String postCommitAuthor,
                      @JsonProperty("updatedDependency") UpdatedDependency updatedDependency,
                      @JsonProperty("licenseInfo") String licenseInfo) {
         this.url = url;

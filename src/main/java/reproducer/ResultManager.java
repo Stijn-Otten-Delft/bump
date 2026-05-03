@@ -12,7 +12,6 @@ import com.github.dockerjava.okhttp.OkDockerHttpClient;
 import miner.*;
 import miner.ReproducibleDependencyUpdate.FailureCategory;
 import miner.ReproducibleDependencyUpdate.UpdatedDependency.UpdatedFileType;
-import okhttp3.OkHttpClient;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +23,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 

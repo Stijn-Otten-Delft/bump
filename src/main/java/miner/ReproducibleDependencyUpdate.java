@@ -126,7 +126,7 @@ public class ReproducibleDependencyUpdate extends DependencyUpdate {
         /**
          * There were test failures after updating the dependency, but not for the preceding commit.
          */
-        TEST_FAILURE;
+        TEST_FAILURE
     }
 
     /**
@@ -134,10 +134,10 @@ public class ReproducibleDependencyUpdate extends DependencyUpdate {
      */
     public static class UpdatedDependency extends DependencyUpdate.UpdatedDependency {
 
-        public String githubCompareLink;
-        public String mavenSourceLinkPre;
-        public String mavenSourceLinkBreaking;
-        public UpdatedFileType updatedFileType;
+        public final String githubCompareLink;
+        public final String mavenSourceLinkPre;
+        public final String mavenSourceLinkBreaking;
+        public final UpdatedFileType updatedFileType;
         public final String licenseInfo;
         public final String githubRepoSlug;
 
