@@ -1,8 +1,9 @@
 package miner;
 
+import miner.common.JavaConstants;
+
 public class ReproducibleDependencyUpdate extends DependencyUpdate {
 
-    private static final String DEFAULT_JAVA_VERSION_FOR_REPRODUCTION = "11";
     public String preCommitReproductionCommand = null;
     public String breakingUpdateReproductionCommand = null;
     public String javaVersionUsedForReproduction;
@@ -39,7 +40,7 @@ public class ReproducibleDependencyUpdate extends DependencyUpdate {
      * Set the default java version used in the reproduction process.
      */
     public void setJavaVersionUsedForReproduction() {
-        this.javaVersionUsedForReproduction = DEFAULT_JAVA_VERSION_FOR_REPRODUCTION;
+        this.javaVersionUsedForReproduction = JavaConstants.DEFAULT_JAVA_VERSION_FOR_REPRODUCTION;
     }
 
     /**

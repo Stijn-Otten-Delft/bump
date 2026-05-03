@@ -1,5 +1,6 @@
 package miner;
 
+import miner.common.PathConstants;
 import okhttp3.Cache;
 import okhttp3.OkHttpClient;
 import org.kohsuke.github.*;
@@ -7,15 +8,10 @@ import org.kohsuke.github.connector.GitHubConnectorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
@@ -30,14 +26,7 @@ import java.util.concurrent.TimeUnit;
  */
 public class GitHubMiner {
 
-    /**
-     * The CACHE_DIR where the HTTP caches will be stored is set to the default system
-     * temporary directory i.e. /tmp/ on most UNIX-like systems.
-     */
-    private static final File CACHE_DIR = Paths.get(System.getProperty("java.io.tmpdir")).toFile();
 
-    /** Default file name for the file containing found repositories */
-    static final String FOUND_REPOS_FILE = "found_repositories.json";
     private final OkHttpClient httpConnector;
     private final GitHubAPITokenQueue tokenQueue;
     private final Path outputDirectory;
@@ -51,7 +40,7 @@ public class GitHubMiner {
     public GitHubMiner(GitHubAPITokenQueue tokenQueue, Path outputDirectory) throws IOException {
         this.outputDirectory = outputDirectory;
         // We use OkHttp with a 10 MB cache for HTTP requests
-        Cache cache = new Cache(CACHE_DIR, 10 * 1024 * 1024);
+        Cache cache = new Cache(PathConstants.CACHE_DIR, 10 * 1024 * 1024);
         httpConnector = new OkHttpClient.Builder()
                 .connectTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(120, TimeUnit.SECONDS)

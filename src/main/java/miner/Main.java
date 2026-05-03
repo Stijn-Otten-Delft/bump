@@ -1,5 +1,6 @@
 package miner;
 
+import miner.common.PathConstants;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -121,7 +122,7 @@ public class Main {
             }
 
             if (repoFile == null) {
-                Path filePath = outputDirectory.resolve(GitHubMiner.FOUND_REPOS_FILE);
+                Path filePath = outputDirectory.resolve(PathConstants.FOUND_REPOS_FILE);
                 try {
                     repoFile = Files.writeString(filePath, JsonUtils.EMPTY_JSON_OBJECT, StandardOpenOption.CREATE_NEW);
                 } catch (IOException e) {

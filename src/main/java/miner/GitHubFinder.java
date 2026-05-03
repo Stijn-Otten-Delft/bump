@@ -1,14 +1,13 @@
 package miner;
 
+import miner.common.PathConstants;
 import okhttp3.Cache;
 import okhttp3.OkHttpClient;
 import org.kohsuke.github.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
@@ -16,12 +15,6 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 public class GitHubFinder {
-    /**
-     * The CACHE_DIR where the HTTP caches will be stored is set to the default system
-     * temporary directory i.e. /tmp/ on most UNIX-like systems.
-     */
-    private static final File CACHE_DIR = Paths.get(System.getProperty("java.io.tmpdir")).toFile();
-
     private final static Logger log = LoggerFactory.getLogger(GitHubFinder.class);
 
     private final OkHttpClient httpConnector;
@@ -31,7 +24,7 @@ public class GitHubFinder {
     public GitHubFinder(GitHubAPITokenQueue tokenQueue) {
         this.tokenQueue = tokenQueue;
 
-        Cache cache = new Cache(CACHE_DIR, 10 * 1024 * 1024);
+        Cache cache = new Cache(PathConstants.CACHE_DIR, 10 * 1024 * 1024);
         this.httpConnector = new OkHttpClient.Builder()
                 .connectTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(120, TimeUnit.SECONDS)
