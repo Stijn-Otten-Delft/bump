@@ -146,6 +146,12 @@ public class Main {
         }
 
         private @NonNull DependencyUpdateReproducer getReproducer() throws IOException {
+            ResultManager resultManager = getResultManager();
+
+            return new DependencyUpdateReproducer(resultManager);
+        }
+
+        private @NonNull ResultManager getResultManager() throws IOException {
             List<String> apiTokens = Files.readAllLines(apiTokenFile);
             GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
 
@@ -162,10 +168,8 @@ public class Main {
 
             DependencyRefLinkFinder dependencyRefLinkFinder = new DependencyRefLinkFinder(tokenQueue);
 
-            ResultManager resultManager = new ResultManager(benchmarkDir, unsuccessfulReproductionsDir,
-                    notReproducedDataDir, logDir, jarDir, gitHubManager, workflowLogFinder, dependencyRefLinkFinder);
-
-            return new DependencyUpdateReproducer(resultManager);
+            return new ResultManager(benchmarkDir, unsuccessfulReproductionsDir, notReproducedDataDir, logDir, jarDir,
+                    gitHubManager, workflowLogFinder, dependencyRefLinkFinder);
         }
     }
 }
