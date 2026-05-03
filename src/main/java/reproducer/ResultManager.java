@@ -26,29 +26,14 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static miner.common.DockerConstants.*;
+
 /**
  * The ResultManager handles storing of reproduction results in the form of logs, jars, Docker images etc.
  *
  * @author <a href="mailto:gabsko@kth.se">Gabriel Skoglund</a>
  */
 public class ResultManager {
-
-    /**
-     * The repository where the created images will be stored
-     */
-    private static final String REPOSITORY = "ghcr.io/chains-project/breaking-updates";
-
-    /**
-     * Tag that will be added as a suffix to breaking update containers containing the state of the repo
-     * directly preceding the breaking update commit.
-     */
-    private static final String PRECEDING_COMMIT_CONTAINER_TAG = "-pre";
-
-    /**
-     * Tag that will be added as a suffix to breaking update containers containing the repo at the commit that
-     * introduced the breaking update.
-     */
-    private static final String BREAKING_UPDATE_COMMIT_CONTAINER_TAG = "-breaking";
 
     private final DockerClient client;
     private final Path benchmarkDir;

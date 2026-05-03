@@ -13,6 +13,7 @@ import com.github.dockerjava.transport.DockerHttpClient;
 import miner.DependencyUpdate;
 import miner.JsonUtils;
 import miner.ReproducibleDependencyUpdate;
+import miner.common.DockerConstants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +28,6 @@ import java.util.*;
  */
 public class DependencyUpdateReproducer {
 
-    public static final String BASE_IMAGE = "ghcr.io/chains-project/breaking-updates:base-image";
     private final Logger log = LoggerFactory.getLogger(this.getClass());
     private static final Short EXIT_CODE_OK = 0;
 
@@ -35,7 +35,7 @@ public class DependencyUpdateReproducer {
     private final DockerClient client;
 
     /**
-     * Set up a new BreakingUpdateReproducer creating new Docker images based on {@value BASE_IMAGE}
+     * Set up a new BreakingUpdateReproducer creating new Docker images based on {@value miner.common.DockerConstants#BASE_IMAGE}
      *
      * @param resultManager the ResultManager that will store information about reproduction results.
      */
@@ -295,10 +295,10 @@ public class DependencyUpdateReproducer {
     /** Ensure that the maven docker image we use as a base exists */
     public void ensureBaseMavenImageExists() throws InterruptedException {
         try {
-            client.inspectImageCmd(BASE_IMAGE).exec();
+            client.inspectImageCmd(DockerConstants.BASE_IMAGE).exec();
         } catch (NotFoundException e) {
-            log.info("Base image not present, pulling {}", BASE_IMAGE);
-            client.pullImageCmd(BASE_IMAGE)
+            log.info("Base image not present, pulling {}", DockerConstants.BASE_IMAGE);
+            client.pullImageCmd(DockerConstants.BASE_IMAGE)
                     .exec(new PullImageResultCallback())
                     .awaitCompletion();
             log.info("Done pulling Maven image");
@@ -309,7 +309,7 @@ public class DependencyUpdateReproducer {
     private void createBaseImageForBreakingUpdate(DependencyUpdate bu) {
         log.info("Creating docker image for breaking update {}", bu.postCommit);
         String projectUrl = bu.url.replaceAll("/pull/\\d+", "");
-        CreateContainerResponse container = client.createContainerCmd(BASE_IMAGE)
+        CreateContainerResponse container = client.createContainerCmd(DockerConstants.BASE_IMAGE)
                 .withCmd("/bin/sh", "-c", "git clone " + projectUrl +
                         " && cd " + bu.project + " && git fetch --depth 2 origin " + bu.postCommit)
                 .exec();

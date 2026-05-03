@@ -8,6 +8,7 @@ import com.github.dockerjava.core.command.PushImageResultCallback;
 import com.github.dockerjava.okhttp.OkDockerHttpClient;
 import miner.GitHubAPITokenQueue;
 import miner.ReproducibleDependencyUpdate;
+import miner.common.GitConstants;
 import okhttp3.OkHttpClient;
 import org.kohsuke.github.*;
 import org.slf4j.Logger;
@@ -17,19 +18,6 @@ import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 
 public class GitHubManager {
-    /**
-     * The repository where the created images will be stored
-     */
-    private static final String REPOSITORY = "ghcr.io/chains-project/breaking-updates";
-    /**
-     * The repository where the log files and jar/pom files will be stored
-     */
-    private static final String CACHE_REPO = "chains-project/breaking-updates-cache";
-    /**
-     * The branch in the CACHE_REPO where the log files and jar/pom files will be committed to.
-     */
-    private static final String BRANCH_NAME = "main";
-
     private final GitHubAPITokenQueue tokenQueue;
     private final GitHubPackagesCredentials registryCredentials;
 
@@ -66,8 +54,8 @@ public class GitHubManager {
             AuthConfig authConfig = new AuthConfig()
                     .withUsername(registryCredentials.userName())
                     .withPassword(registryCredentials.identityToken())
-                    .withRegistryAddress(REPOSITORY);
-            client.pushImageCmd(REPOSITORY)
+                    .withRegistryAddress(GitConstants.REPOSITORY);
+            client.pushImageCmd(GitConstants.REPOSITORY)
                     .withTag(bu.postCommit + extraTag)
                     .withAuthConfig(authConfig)
                     .exec(new PushImageResultCallback())
@@ -83,8 +71,8 @@ public class GitHubManager {
     public void pushFiles(String breakingCommit, String fileName, byte[] fileContent) {
         try {
             GitHub github = tokenQueue.getGitHub(httpConnector);
-            GHRepository repo = github.getRepository(CACHE_REPO);
-            GHRef branchRef = repo.getRef("heads/" + BRANCH_NAME);
+            GHRepository repo = github.getRepository(GitConstants.CACHE_REPO);
+            GHRef branchRef = repo.getRef("heads/" + GitConstants.BRANCH_NAME);
             String latestCommitHash = branchRef.getObject().getSha();
             // Create the tree.
             GHTreeBuilder treeBuilder = repo.createTree();
@@ -99,12 +87,12 @@ public class GitHubManager {
                     .create();
             // Update the branch reference.
             branchRef.updateTo(commit.getSHA1());
-            log.info("Successfully pushed the {} to the {}.", fileName, CACHE_REPO);
+            log.info("Successfully pushed the {} to the {}.", fileName, GitConstants.CACHE_REPO);
         } catch (IOException e) {
-            log.error("Failed to push the {} to the {}.", fileName, CACHE_REPO, e);
+            log.error("Failed to push the {} to the {}.", fileName, GitConstants.CACHE_REPO, e);
         } catch (GHException e) {
             log.error("The provided GitHub token does not have the permission to push the {} to the {}",
-                    fileName, CACHE_REPO, e);
+                    fileName, GitConstants.CACHE_REPO, e);
         }
     }
 }
