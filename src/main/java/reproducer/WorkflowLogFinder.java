@@ -30,6 +30,8 @@ import java.util.concurrent.TimeUnit;
  */
 public class WorkflowLogFinder {
     private final String chromeDriverPath;
+    private final String userDataDir;
+    private final String baseDownloadDirectory;
 
     private final OkHttpClient httpConnector;
     private final GitHubAPITokenQueue tokenQueue;
@@ -38,9 +40,11 @@ public class WorkflowLogFinder {
     /**
      * @param tokenQueue    a GitHubAPITokenQueue of GitHub API tokens.
      */
-    public WorkflowLogFinder(GitHubAPITokenQueue tokenQueue, String chromeDriverPath) {
+    public WorkflowLogFinder(GitHubAPITokenQueue tokenQueue, String chromeDriverPath,  String userDataDir, String baseDownloadDirectory) {
         this.tokenQueue = tokenQueue;
         this.chromeDriverPath = chromeDriverPath;
+        this.baseDownloadDirectory = baseDownloadDirectory;
+        this.userDataDir = userDataDir;
         this.httpConnector = new OkHttpClient.Builder()
                 .connectTimeout(60, TimeUnit.SECONDS)
                 .writeTimeout(120, TimeUnit.SECONDS)
@@ -51,8 +55,7 @@ public class WorkflowLogFinder {
      * Fetch the failed jobs in configured GitHub workflows for the breaking update pull request and extract the path
      * to the workflow log files.
      */
-    public void extractWorkflowLogFile(String baseDownloadDirectory, String usrDataDirectory,
-                                       DependencyUpdate bu) throws IOException {
+    public void extractWorkflowLogFile(DependencyUpdate bu) throws IOException {
         MapType jsonType = JsonUtils.getTypeFactory().constructMapType(Map.class, String.class, Object.class);
         Path workflowLogFilePath = Path.of(baseDownloadDirectory + "/workflowLogLocations" + JsonUtils.JSON_FILE_ENDING);
         if (Files.notExists(workflowLogFilePath)) {
@@ -90,7 +93,7 @@ public class WorkflowLogFinder {
                         .stream().filter(run -> run.getConclusion().equals(GHWorkflowRun.Conclusion.FAILURE))
                         .toList())) {
                     String jobUrl = String.valueOf(ghWorkflowJob.getHtmlUrl());
-                    if (downloadLogFile(jobUrl, downloadDirectory, usrDataDirectory))
+                    if (downloadLogFile(jobUrl, downloadDirectory))
                         logLocation.put(jobUrl, true);
                     else
                         logLocation.put(jobUrl, false);
@@ -105,7 +108,7 @@ public class WorkflowLogFinder {
     /**
      * Download the workflow log files using a Selenium web crawler.
      */
-    private boolean downloadLogFile(String prUrl, String downloadDirectory,  String usrDataDirectory)
+    private boolean downloadLogFile(String prUrl, String downloadDirectory)
             throws IOException {
         if (Files.list(Path.of(downloadDirectory)).findAny().isPresent())
             return true;
@@ -118,8 +121,8 @@ public class WorkflowLogFinder {
         options.addArguments("--disable-gpu");
         options.addArguments("--no-sandbox");
 
-        if (usrDataDirectory != null)
-            options.addArguments("user-data-dir=%s".formatted(usrDataDirectory));
+        if (userDataDir != null)
+            options.addArguments("user-data-dir=%s".formatted(userDataDir));
         Map<String, Object> prefs = new HashMap<>();
         prefs.put("download.default_directory", downloadDirectory);
         options.setExperimentalOption("prefs", prefs);

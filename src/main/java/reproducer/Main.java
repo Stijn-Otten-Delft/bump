@@ -87,8 +87,7 @@ public class Main {
         @CommandLine.Option(
                 names = {"-c", "--github-packages-credentials"},
                 paramLabel = "GITHUB-PACKAGES-CREDENTIALS",
-                description = "A JSON file containing the credentials required to push an image to GitHub packages.",
-                required = true
+                description = "A JSON file containing the credentials required to push an image to GitHub packages."
         )
         Path credentialsFile;
 
@@ -126,6 +125,10 @@ public class Main {
         @Override
         public void run() {
             try {
+                if(!noPush && credentialsFile == null) {
+                    throw new IllegalArgumentException("GitHub packages credentials file must be provided if pushing to GitHub packages is enabled.");
+                }
+
                 DependencyUpdateReproducer reproducer = getReproducer();
 
                 if (breakingUpdateFile != null) {
@@ -146,16 +149,21 @@ public class Main {
             List<String> apiTokens = Files.readAllLines(apiTokenFile);
             GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
 
-            GitHubPackagesCredentials credentials = GitHubPackagesCredentials.fromJson(credentialsFile);
+            GitHubManager gitHubManager = null;
+            if(!noPush) {
+                GitHubPackagesCredentials credentials = GitHubPackagesCredentials.fromJson(credentialsFile);
+                gitHubManager = new GitHubManager(tokenQueue, credentials);
+            }
 
-            GitHubManager gitHubManager = noPush ? null : new GitHubManager(tokenQueue);
+            WorkflowLogFinder workflowLogFinder = null;
+            if(workflowDir != null) {
+                workflowLogFinder = new WorkflowLogFinder(tokenQueue, chromeDriverPath, userDataDir, workflowDir);
+            }
 
-            WorkflowLogFinder workflowLogFinder = new WorkflowLogFinder(tokenQueue, chromeDriverPath);
             DependencyRefLinkFinder dependencyRefLinkFinder = new DependencyRefLinkFinder(tokenQueue);
 
-
             ResultManager resultManager = new ResultManager(benchmarkDir, unsuccessfulReproductionsDir,
-                    notReproducedDataDir, logDir, jarDir, workflowDir, userDataDir, credentials, gitHubManager, !noPush, workflowLogFinder, dependencyRefLinkFinder);
+                    notReproducedDataDir, logDir, jarDir, gitHubManager, workflowLogFinder, dependencyRefLinkFinder);
 
             return new DependencyUpdateReproducer(resultManager);
         }

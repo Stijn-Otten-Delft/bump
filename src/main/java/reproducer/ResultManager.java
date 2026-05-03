@@ -57,15 +57,12 @@ public class ResultManager {
     private final Path unsuccessfulReproductionDir;
     private final Path notReproducedDataDir;
     private final Path jarDir;
-    private final String workflowDir;
-    private final String userDataDir;
+
     private final Path successfulReproductionLogDir;
     private final Path unsuccessfulReproductionLogDir;
 
-    private final GitHubPackagesCredentials registryCredentials;
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 
-    private final boolean pushToGitHub;
     private final GitHubManager gitHubManager;
     private final WorkflowLogFinder workflowLogFinder;
     private final DependencyRefLinkFinder dependencyRefLinkFinder;
@@ -97,14 +94,10 @@ public class ResultManager {
      * @param logDir                      the directory where maven logs should be stored.
      * @param jarDir                      the directory where jar files corresponding to changed dependencies should be
      *                                    stored.
-     * @param registryCredentials         the directory where jar files corresponding to changed dependencies should be
-     *                                    stored.
      */
-    public ResultManager(Path benchmarkDir, Path unsuccessfulReproductionDir,
-                         Path notReproducedDataDir, Path logDir, Path jarDir, String workflowDir, String userDataDir,
-                         GitHubPackagesCredentials registryCredentials, GitHubManager gitHubManager,
-                         boolean pushToGithub, WorkflowLogFinder workflowLogFinder, DependencyRefLinkFinder dependencyRefLinkFinder) {
-        this.pushToGitHub = pushToGithub;
+    public ResultManager(Path benchmarkDir, Path unsuccessfulReproductionDir, Path notReproducedDataDir,
+                         Path logDir, Path jarDir, GitHubManager gitHubManager,
+                         WorkflowLogFinder workflowLogFinder, DependencyRefLinkFinder dependencyRefLinkFinder) {
         this.gitHubManager = gitHubManager;
         this.workflowLogFinder = workflowLogFinder;
         this.dependencyRefLinkFinder = dependencyRefLinkFinder;
@@ -115,9 +108,6 @@ public class ResultManager {
         this.unsuccessfulReproductionDir = unsuccessfulReproductionDir;
         this.notReproducedDataDir = notReproducedDataDir;
         this.jarDir = jarDir;
-        this.workflowDir = workflowDir;
-        this.userDataDir = userDataDir;
-        this.registryCredentials = registryCredentials;
         successfulReproductionLogDir = logDir.resolve("successfulReproductionLogs");
         unsuccessfulReproductionLogDir = logDir.resolve("unsuccessfulReproductionLogs");
         if (Files.notExists(successfulReproductionLogDir) || Files.notExists(unsuccessfulReproductionLogDir)) {
@@ -166,7 +156,7 @@ public class ResultManager {
     public void storeResult(DependencyUpdate bu, String postContainerId, String prevContainerId) {
         Path logOutputLocation = successfulReproductionLogDir.resolve(bu.postCommit + ".log");
 
-        if(pushToGitHub) {
+        if(gitHubManager != null) {
             // Push the saved log file to the cache repo.
             try {
                 byte[] fileContent = Files.readAllBytes(logOutputLocation);
@@ -213,10 +203,10 @@ public class ResultManager {
         createImage(reproducibleDU, prevContainerId, PRECEDING_COMMIT_CONTAINER_TAG);
         createImage(reproducibleDU, postContainerId, BREAKING_UPDATE_COMMIT_CONTAINER_TAG);
 
-        if(pushToGitHub) {
+        if(gitHubManager != null) {
             log.info("Pushing the created images for breaking update {}", reproducibleDU.postCommit);
-            gitHubManager.pushImage(reproducibleDU, PRECEDING_COMMIT_CONTAINER_TAG, registryCredentials);
-            gitHubManager.pushImage(reproducibleDU, BREAKING_UPDATE_COMMIT_CONTAINER_TAG, registryCredentials);
+            gitHubManager.pushImage(reproducibleDU, PRECEDING_COMMIT_CONTAINER_TAG);
+            gitHubManager.pushImage(reproducibleDU, BREAKING_UPDATE_COMMIT_CONTAINER_TAG);
         }
         storeImageMetadata(reproducibleDU, List.of(PRECEDING_COMMIT_CONTAINER_TAG, BREAKING_UPDATE_COMMIT_CONTAINER_TAG),
                 List.of("/root/.m2", "/" + reproducibleDU.project));
@@ -230,15 +220,16 @@ public class ResultManager {
         JsonUtils.writeToFile(benchmarkDir.resolve(reproducibleDU.postCommit + JsonUtils.JSON_FILE_ENDING),
                 reproducibleDU);
 
-        if (workflowDir != null) {
+        if (workflowLogFinder != null) {
             // Download the workflow log files.
             try {
-                workflowLogFinder.extractWorkflowLogFile(workflowDir, userDataDir, bu);
+                workflowLogFinder.extractWorkflowLogFile(bu);
             } catch (IOException e) {
                 log.error("Could not download the workflow log files for the BU {}", reproducibleDU.postCommit, e);
             }
         }
         // Delete the local images.
+        // todo maybe make this a flag
         deleteImages(reproducibleDU.postCommit);
     }
 
@@ -292,7 +283,7 @@ public class ResultManager {
                 byte[] fileContent = dependencyStream.readAllBytes();
                 Files.write(dir.resolve(fileName), fileContent);
 
-                if(pushToGitHub) {
+                if(gitHubManager != null) {
                     // Push the saved old jar/pom file to the cache repo.
                     String jarName = "%s__%s__%s___prev.%s".formatted(bu.updatedDependency.dependencyGroupID, bu.updatedDependency
                             .dependencyArtifactID, bu.updatedDependency.previousVersion, type);
@@ -323,7 +314,7 @@ public class ResultManager {
                 byte[] fileContent = dependencyStream.readAllBytes();
                 Files.write(dir.resolve(fileName), fileContent);
 
-                if(pushToGitHub) {
+                if(gitHubManager != null) {
                     // Push the saved new jar/pom file to the cache repo.
                     String jarName = "%s__%s__%s___new.%s".formatted(bu.updatedDependency.dependencyGroupID, bu.updatedDependency
                             .dependencyArtifactID, bu.updatedDependency.newVersion, type);

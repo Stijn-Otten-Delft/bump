@@ -32,8 +32,9 @@ public class GitHubManager {
     private static final String BRANCH_NAME = "main";
 
     private final GitHubAPITokenQueue tokenQueue;
-    private final DockerClient client;
+    private final GitHubPackagesCredentials registryCredentials;
 
+    private final DockerClient client;
     private final OkHttpClient httpConnector;
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 
@@ -41,9 +42,12 @@ public class GitHubManager {
     /**
      *
      * @param tokenQueue                   a queue of GitHub API tokens.
+     * @param registryCredentials         the directory where jar files corresponding to changed dependencies should be
+     *                                    stored.
      */
-    public GitHubManager(GitHubAPITokenQueue tokenQueue) throws IOException {
+    public GitHubManager(GitHubAPITokenQueue tokenQueue, GitHubPackagesCredentials registryCredentials) throws IOException {
         this.tokenQueue = tokenQueue;
+        this.registryCredentials = registryCredentials;
 
         var config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
         this.client = DockerClientImpl.getInstance(config,
@@ -58,7 +62,7 @@ public class GitHubManager {
     /**
      * Push an image to GitHub packages using the provided credentials.
      */
-    public void pushImage(ReproducibleDependencyUpdate bu, String extraTag, GitHubPackagesCredentials registryCredentials) {
+    public void pushImage(ReproducibleDependencyUpdate bu, String extraTag) {
         try {
             AuthConfig authConfig = new AuthConfig()
                     .withUsername(registryCredentials.userName())
