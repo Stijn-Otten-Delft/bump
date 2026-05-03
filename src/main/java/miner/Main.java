@@ -105,6 +105,12 @@ public class Main {
                 required = false
         )
         Date lastDate;
+        @CommandLine.Option(
+                names = {"-m", "--max-repos", "--max"},
+                paramLabel = "MAX-REPOS",
+                description = "Maximum number of repositories to find"
+        )
+        Integer maxRepos;
 
         @Override
         public void run() {
@@ -124,7 +130,8 @@ public class Main {
                 List<String> apiTokens = Files.readAllLines(apiTokenFile);
                 RepositorySearchConfig searchConfig = RepositorySearchConfig.fromJson(searchConfigFile);
                 var repoList = new RepositoryList(repoFile);
-                new GitHubMiner(apiTokens, outputDirectory).findRepositories(repoList, searchConfig,lastDate);
+                if (maxRepos == null) maxRepos = Integer.MAX_VALUE;
+                new GitHubMiner(apiTokens, outputDirectory).findRepositories(repoList, searchConfig,lastDate, maxRepos);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

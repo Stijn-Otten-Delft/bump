@@ -77,7 +77,7 @@ public class GitHubMiner {
      * @param searchConfig a {@link RepositorySearchConfig} specifying the repositories to look for.
      * @throws IOException if there is an issue when interacting with the file system.
      */
-    public void findRepositories(RepositoryList repoList, RepositorySearchConfig searchConfig,Date lastDate) throws IOException {
+    public void findRepositories(RepositoryList repoList, RepositorySearchConfig searchConfig,Date lastDate, int maxRepos) throws IOException {
         log.info("Finding valid repositories");
         int previousSize = repoList.size();
         LocalDate creationDate = lastDate !=null ? lastDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate() : LocalDate.now(ZoneId.systemDefault());
@@ -85,11 +85,11 @@ public class GitHubMiner {
 
         LocalDate earliestCreationDate =
                 searchConfig.earliestCreationDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        while (creationDate.isAfter(earliestCreationDate)) {
+        while (creationDate.isAfter(earliestCreationDate) && (repoList.size() - previousSize) < maxRepos) {
             log.info("Checking repos created on {} ", creationDate);
             PagedIterator<GHRepository> iterator = search.iterator();
-            while (iterator.hasNext()) {
-                iterator.nextPage().stream()
+            while (iterator.hasNext() && (repoList.size() - previousSize) < maxRepos) {
+                List<GHRepository> validRepos = iterator.nextPage().stream()
                         .filter(repository -> !repoList.contains(repository))
                         .peek(repository -> System.out.println("  Checking " + repository.getFullName()))
                         .filter(RepositoryFilters.isMavenProject)
@@ -98,10 +98,15 @@ public class GitHubMiner {
                                 searchConfig.minNumberOfCommits))
                         .filter(repository -> RepositoryFilters.hasSufficientNumberOfContributors(repository,
                                 searchConfig.minNumberOfContributors))
-                        .forEach(repository -> {
-                            repoList.add(repository);
-                            log.info("  Found " + repository.getUrl());
-                        });
+                        .toList();
+
+                for (GHRepository repository : validRepos) {
+                    if ((repoList.size() - previousSize) >= maxRepos) {
+                        break;
+                    }
+                    repoList.add(repository);
+                    log.info("  Found " + repository.getUrl());
+                }
             }
             creationDate = creationDate.minusDays(1);
             search = searchForRepos(searchConfig.minNumberOfStars, creationDate);
@@ -183,31 +188,39 @@ public class GitHubMiner {
      * Iterate over all pull requests of a repo added after a given date and save ones that contain breaking updates
      */
     private void mineRepo(String repo, Date cutoffDate) throws IOException {
-        log.info("Checking " + repo);
-        GHRepository repository = tokenQueue.getGitHub(httpConnector).getRepository(repo);
-        PagedIterator<GHPullRequest> pullRequests = repository.queryPullRequests()
-                .state(GHIssueState.ALL)
-                .sort(GHPullRequestQueryBuilder.Sort.CREATED)
-                .direction(GHDirection.DESC)
-                .list().iterator();
+        try {
+            log.info("Checking " + repo);
+            GHRepository repository = tokenQueue.getGitHub(httpConnector).getRepository(repo);
+            PagedIterator<GHPullRequest> pullRequests = repository.queryPullRequests()
+                    .state(GHIssueState.ALL)
+                    .sort(GHPullRequestQueryBuilder.Sort.CREATED)
+                    .direction(GHDirection.DESC)
+                    .list().iterator();
 
-        while (pullRequests.hasNext()) {
-            List<GHPullRequest> nextPage = pullRequests.nextPage();
-            if (PullRequestFilters.createdBefore(cutoffDate).test(nextPage.get(0))) {
-                log.info("Checked all PRs for " + repo + " created after " + cutoffDate);
-                break;
+            while (pullRequests.hasNext()) {
+                List<GHPullRequest> nextPage = pullRequests.nextPage();
+                if (PullRequestFilters.createdBefore(cutoffDate).test(nextPage.get(0))) {
+                    log.info("Checked all PRs for " + repo + " created after " + cutoffDate);
+                    break;
+                }
+                nextPage.stream()
+                        .takeWhile(PullRequestFilters.createdBefore(cutoffDate).negate())
+                        .filter(PullRequestFilters.changesOnlyDependencyVersionInPomXML)
+                        //.filter(PullRequestFilters.breaksBuild)
+                        .map(DependencyUpdate::new)
+                        .forEach(breakingUpdate -> {
+                            if (!breakingUpdate.updatedDependency.dependencyScope.equals("test")) {
+                                writeBreakingUpdate(breakingUpdate);
+                                log.info("    Found " + breakingUpdate.url);
+                            }
+                        });
             }
-            nextPage.stream()
-                    .takeWhile(PullRequestFilters.createdBefore(cutoffDate).negate())
-                    .filter(PullRequestFilters.changesOnlyDependencyVersionInPomXML)
-                    .filter(PullRequestFilters.breaksBuild)
-                    .map(DependencyUpdate::new)
-                    .forEach(breakingUpdate -> {
-                        if (!breakingUpdate.updatedDependency.dependencyScope.equals("test")) {
-                            writeBreakingUpdate(breakingUpdate);
-                            log.info("    Found " + breakingUpdate.url);
-                        }
-                    });
+        } catch (IOException e) {
+            log.error("Got IOException while mining {}", repo, e);
+            throw e;
+        } catch (Exception e) {
+            log.error("Got exception while mining {}", repo, e);
+            log.info("Skipping {} instead of failing", repo);
         }
     }
 
