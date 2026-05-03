@@ -75,6 +75,12 @@ public class GitHubAPITokenQueue {
             .build();
     }
 
+    public String getToken() {
+        String apiToken = tokenQueue.remove();
+        tokenQueue.add(apiToken);
+        return apiToken;
+    }
+
     /**
      * @return The number of API tokens available from this token queue.
      */

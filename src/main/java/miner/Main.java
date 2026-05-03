@@ -1,6 +1,5 @@
 package miner;
 
-import miner.GitHubMiner.RepositorySearchConfig;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -58,8 +57,12 @@ public class Main {
         public void run() {
             try {
                 List<String> apiTokens = Files.readAllLines(apiTokenFile);
+                GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
+
                 RepositoryList repoList = new RepositoryList(repoFile);
-                new GitHubMiner(apiTokens, outputDirectory).mineRepositories(repoList);
+                GitHubMiner gitHubMiner = new GitHubMiner(tokenQueue, outputDirectory);
+
+                gitHubMiner.mineRepositories(repoList);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -127,10 +130,14 @@ public class Main {
             }
             try {
                 List<String> apiTokens = Files.readAllLines(apiTokenFile);
+                GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
+
                 RepositorySearchConfig searchConfig = RepositorySearchConfig.fromJson(searchConfigFile);
                 var repoList = new RepositoryList(repoFile);
                 if (maxRepos == null) maxRepos = Integer.MAX_VALUE;
-                new GitHubMiner(apiTokens, outputDirectory).findRepositories(repoList, searchConfig,lastDate, maxRepos);
+
+                GitHubFinder gitHubFinder = new GitHubFinder(tokenQueue);
+                gitHubFinder.findRepositories(repoList, searchConfig, lastDate, maxRepos);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }

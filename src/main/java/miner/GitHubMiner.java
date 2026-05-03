@@ -41,14 +41,14 @@ public class GitHubMiner {
     private final OkHttpClient httpConnector;
     private final GitHubAPITokenQueue tokenQueue;
     private final Path outputDirectory;
-    private final Logger log = LoggerFactory.getLogger(this.getClass());
+    private final static Logger log = LoggerFactory.getLogger(GitHubMiner.class);
 
     /**
-     * @param apiTokens a collection of GitHub API tokens.
+     * @param tokenQueue a collection of GitHub API tokens.
      * @param outputDirectory a path to the directory where found breaking updates will be stored.
      * @throws IOException if there is an issue connecting to the GitHub servers.
      */
-    public GitHubMiner(Collection<String> apiTokens, Path outputDirectory) throws IOException {
+    public GitHubMiner(GitHubAPITokenQueue tokenQueue, Path outputDirectory) throws IOException {
         this.outputDirectory = outputDirectory;
         // We use OkHttp with a 10 MB cache for HTTP requests
         Cache cache = new Cache(CACHE_DIR, 10 * 1024 * 1024);
@@ -57,80 +57,11 @@ public class GitHubMiner {
                 .writeTimeout(120, TimeUnit.SECONDS)
                 .readTimeout(60, TimeUnit.SECONDS)
                 .cache(cache).build();
-        tokenQueue = new GitHubAPITokenQueue(apiTokens);
-        String apiToken = apiTokens.iterator().next();
+        this.tokenQueue = tokenQueue;
+        String apiToken = tokenQueue.getToken();
         GitPatchCache.initialize(httpConnector, apiToken);
     }
 
-    /**
-     * Query GitHub for repositories that are Maven projects and has
-     * GitHub actions that are run on pull requests. The found repositories
-     * will be stored in a file called found_repositories in the specified
-     * output directory.
-     * <p>
-     * Since GitHub will only return at most 1000 results per API call,
-     * and searching is restricted to a tighter API rate limit,
-     * this method will attempt to perform sequential queries using different
-     * API tokens until the full search result has been returned.
-     *
-     * @param repoList a {@link RepositoryList} of previously found repositories.
-     * @param searchConfig a {@link RepositorySearchConfig} specifying the repositories to look for.
-     * @throws IOException if there is an issue when interacting with the file system.
-     */
-    public void findRepositories(RepositoryList repoList, RepositorySearchConfig searchConfig,Date lastDate, int maxRepos) throws IOException {
-        log.info("Finding valid repositories");
-        int previousSize = repoList.size();
-        LocalDate creationDate = lastDate !=null ? lastDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate() : LocalDate.now(ZoneId.systemDefault());
-        PagedSearchIterable<GHRepository> search = searchForRepos(searchConfig.minNumberOfStars, creationDate);
-
-        LocalDate earliestCreationDate =
-                searchConfig.earliestCreationDate.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        while (creationDate.isAfter(earliestCreationDate) && (repoList.size() - previousSize) < maxRepos) {
-            log.info("Checking repos created on {} ", creationDate);
-            PagedIterator<GHRepository> iterator = search.iterator();
-            while (iterator.hasNext() && (repoList.size() - previousSize) < maxRepos) {
-                List<GHRepository> validRepos = iterator.nextPage().stream()
-                        .filter(repository -> !repoList.contains(repository))
-                        .peek(repository -> System.out.println("  Checking " + repository.getFullName()))
-                        .filter(RepositoryFilters.isMavenProject)
-                        .filter(RepositoryFilters.hasPullRequestWorkflows)
-                        .filter(repository -> RepositoryFilters.hasSufficientNumberOfCommits(repository,
-                                searchConfig.minNumberOfCommits))
-                        .filter(repository -> RepositoryFilters.hasSufficientNumberOfContributors(repository,
-                                searchConfig.minNumberOfContributors))
-                        .toList();
-
-                for (GHRepository repository : validRepos) {
-                    if ((repoList.size() - previousSize) >= maxRepos) {
-                        break;
-                    }
-                    repoList.add(repository);
-                    log.info("  Found {}", repository.getUrl());
-                }
-            }
-            creationDate = creationDate.minusDays(1);
-            search = searchForRepos(searchConfig.minNumberOfStars, creationDate);
-            repoList.writeToFile();
-        }
-        log.info("Found {} valid repositories", repoList.size() - previousSize);
-    }
-
-    /**
-     * Search for GitHub repos that use Java as the main language, having the required minimum number
-     * of stars and having been created at the given date. Forks will be ignored and the result will
-     * be sorted based on the number of stars, descending.
-     */
-    private PagedSearchIterable<GHRepository> searchForRepos(int minNumberOfStars, LocalDate creationDate)
-            throws IOException {
-        return tokenQueue.getGitHub(httpConnector).searchRepositories()
-                .language("Java")
-                .fork(GHFork.PARENT_ONLY)
-                .stars(">=" + minNumberOfStars)
-                .created(creationDate.toString())
-                .sort(GHRepositorySearchBuilder.Sort.STARS)
-                .order(GHDirection.DESC)
-                .list();
-    }
 
     /**
      * Query the given GitHub repositories for pull requests that changes a
@@ -230,21 +161,6 @@ public class GitHubMiner {
     public void writeBreakingUpdate(DependencyUpdate dependencyUpdate) {
         Path path = outputDirectory.resolve(dependencyUpdate.postCommit + JsonUtils.JSON_FILE_ENDING);
         JsonUtils.writeToFile(path, dependencyUpdate);
-    }
-
-    /**
-     * The RepositorySearchConfig contains information used when finding suitable repositories.
-     *
-     * @param minNumberOfStars        the minimum numbers of stars the repository should have.
-     * @param earliestCreationDate    the earliest allowed creation date for the repository.
-     * @param minNumberOfCommits      the minimum numbers of commits the repository should have.
-     * @param minNumberOfContributors the minimum numbers of contributors the repository should have.
-     */
-    public record RepositorySearchConfig(int minNumberOfStars, Date earliestCreationDate, int minNumberOfCommits,
-                                         int minNumberOfContributors) {
-        public static RepositorySearchConfig fromJson(Path jsonFile) {
-            return JsonUtils.readFromFile(jsonFile, RepositorySearchConfig.class);
-        }
     }
 
     /**
