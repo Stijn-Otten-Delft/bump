@@ -1,10 +1,11 @@
 package reproducer;
 
 import com.fasterxml.jackson.databind.type.MapType;
-import miner.BreakingUpdate;
+import miner.DependencyUpdate;
 import miner.GitHubAPITokenQueue;
 import miner.JsonUtils;
 import okhttp3.OkHttpClient;
+import org.jspecify.annotations.NonNull;
 import org.kohsuke.github.*;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
@@ -23,30 +24,39 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * The WorkflowLogFinder involves in downloading workflow log files related to the failed jobs in the updated dependency.
  */
 public class WorkflowLogFinder {
+    private final String chromeDriverPath;
+    private final String userDataDir;
+    private final String baseDownloadDirectory;
+
     private final OkHttpClient httpConnector;
     private final GitHubAPITokenQueue tokenQueue;
     private final Logger log = LoggerFactory.getLogger(this.getClass());
 
     /**
      * @param tokenQueue    a GitHubAPITokenQueue of GitHub API tokens.
-     * @param httpConnector an OkHttpClient instance.
      */
-    public WorkflowLogFinder(GitHubAPITokenQueue tokenQueue, OkHttpClient httpConnector) {
-        this.httpConnector = httpConnector;
+    public WorkflowLogFinder(GitHubAPITokenQueue tokenQueue, String chromeDriverPath,  String userDataDir, String baseDownloadDirectory) {
         this.tokenQueue = tokenQueue;
+        this.chromeDriverPath = chromeDriverPath;
+        this.baseDownloadDirectory = baseDownloadDirectory;
+        this.userDataDir = userDataDir;
+        this.httpConnector = new OkHttpClient.Builder()
+                .connectTimeout(60, TimeUnit.SECONDS)
+                .writeTimeout(120, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS).build();
     }
 
     /**
      * Fetch the failed jobs in configured GitHub workflows for the breaking update pull request and extract the path
      * to the workflow log files.
      */
-    public void extractWorkflowLogFile(String baseDownloadDirectory, String chromeDriverPath, String usrDataDirectory,
-                                       BreakingUpdate bu) throws IOException {
+    public void extractWorkflowLogFile(DependencyUpdate bu) throws IOException {
         MapType jsonType = JsonUtils.getTypeFactory().constructMapType(Map.class, String.class, Object.class);
         Path workflowLogFilePath = Path.of(baseDownloadDirectory + "/workflowLogLocations" + JsonUtils.JSON_FILE_ENDING);
         if (Files.notExists(workflowLogFilePath)) {
@@ -57,7 +67,7 @@ public class WorkflowLogFinder {
             workflowLogs = new HashMap<>();
         }
 
-        String downloadDirectory = baseDownloadDirectory + "\\" + bu.breakingCommit + "\\";
+        String downloadDirectory = baseDownloadDirectory + "\\" + bu.postCommit + "\\";
         if (!Files.exists(Path.of(downloadDirectory))) {
             new File(downloadDirectory).mkdirs();
 
@@ -84,13 +94,13 @@ public class WorkflowLogFinder {
                         .stream().filter(run -> run.getConclusion().equals(GHWorkflowRun.Conclusion.FAILURE))
                         .toList())) {
                     String jobUrl = String.valueOf(ghWorkflowJob.getHtmlUrl());
-                    if (downloadLogFile(jobUrl, downloadDirectory, chromeDriverPath, usrDataDirectory))
+                    if (downloadLogFile(jobUrl, downloadDirectory))
                         logLocation.put(jobUrl, true);
                     else
                         logLocation.put(jobUrl, false);
                 }
             }
-            workflowLogs.put(bu.breakingCommit, logLocation);
+            workflowLogs.put(bu.postCommit, logLocation);
 
             JsonUtils.writeToFile(workflowLogFilePath, workflowLogs);
         }
@@ -99,7 +109,7 @@ public class WorkflowLogFinder {
     /**
      * Download the workflow log files using a Selenium web crawler.
      */
-    private boolean downloadLogFile(String prUrl, String downloadDirectory, String chromeDriverPath, String usrDataDirectory)
+    private boolean downloadLogFile(String prUrl, String downloadDirectory)
             throws IOException {
         if (Files.list(Path.of(downloadDirectory)).findAny().isPresent())
             return true;
@@ -107,18 +117,7 @@ public class WorkflowLogFinder {
         if (System.getProperty("os.name").startsWith("Windows"))
             System.setProperty("webdriver.chrome.driver", chromeDriverPath);
 
-        ChromeOptions options = new ChromeOptions();
-        options.addArguments("--disable-extensions");
-        options.addArguments("--disable-gpu");
-        options.addArguments("--no-sandbox");
-
-        if (usrDataDirectory != null)
-            options.addArguments("user-data-dir=%s".formatted(usrDataDirectory));
-        Map<String, Object> prefs = new HashMap<>();
-        prefs.put("download.default_directory", downloadDirectory);
-        options.setExperimentalOption("prefs", prefs);
-
-        WebDriver driver = new ChromeDriver(options);
+        WebDriver driver = getWebDriver(downloadDirectory);
 
         try {
             driver.get(prUrl);
@@ -141,5 +140,20 @@ public class WorkflowLogFinder {
         } finally {
             driver.quit();
         }
+    }
+
+    private @NonNull WebDriver getWebDriver(String downloadDirectory) {
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--disable-extensions");
+        options.addArguments("--disable-gpu");
+        options.addArguments("--no-sandbox");
+
+        if (userDataDir != null)
+            options.addArguments("user-data-dir=%s".formatted(userDataDir));
+        Map<String, Object> prefs = new HashMap<>();
+        prefs.put("download.default_directory", downloadDirectory);
+        options.setExperimentalOption("prefs", prefs);
+
+        return new ChromeDriver(options);
     }
 }

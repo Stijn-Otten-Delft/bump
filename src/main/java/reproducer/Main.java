@@ -1,7 +1,9 @@
 package reproducer;
 
-import miner.BreakingUpdate;
+import miner.DependencyUpdate;
+import miner.GitHubAPITokenQueue;
 import miner.JsonUtils;
+import org.jspecify.annotations.NonNull;
 import picocli.CommandLine;
 
 import java.io.File;
@@ -9,7 +11,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-
 /**
  * This class represents the main entry point to the breaking update reproducer.
  *
@@ -86,8 +87,7 @@ public class Main {
         @CommandLine.Option(
                 names = {"-c", "--github-packages-credentials"},
                 paramLabel = "GITHUB-PACKAGES-CREDENTIALS",
-                description = "A JSON file containing the credentials required to push an image to GitHub packages.",
-                required = true
+                description = "A JSON file containing the credentials required to push an image to GitHub packages."
         )
         Path credentialsFile;
 
@@ -115,17 +115,24 @@ public class Main {
         )
         String chromeDriverPath;
 
+        @CommandLine.Option(
+                names = {"-np", "--no-push", "--dont-push"},
+                paramLabel = "DONT-PUSH",
+                description = "Set this flag if you do not want to push to a remote repo"
+        )
+        boolean noPush;
+
         @Override
         public void run() {
             try {
-                List<String> apiTokens = Files.readAllLines(apiTokenFile);
-                ResultManager.GitHubPackagesCredentials credentials = ResultManager.GitHubPackagesCredentials
-                        .fromJson(credentialsFile);
-                ResultManager resultManager = new ResultManager(apiTokens, benchmarkDir, unsuccessfulReproductionsDir,
-                        notReproducedDataDir, logDir, jarDir, workflowDir, userDataDir, chromeDriverPath, credentials);
-                BreakingUpdateReproducer reproducer = new BreakingUpdateReproducer(resultManager);
+                if(!noPush && credentialsFile == null) {
+                    throw new IllegalArgumentException("GitHub packages credentials file must be provided if pushing to GitHub packages is enabled.");
+                }
+
+                DependencyUpdateReproducer reproducer = getReproducer();
+
                 if (breakingUpdateFile != null) {
-                    BreakingUpdate bu = JsonUtils.readFromFile(breakingUpdateFile, BreakingUpdate.class);
+                    DependencyUpdate bu = JsonUtils.readFromFile(breakingUpdateFile, DependencyUpdate.class);
                     reproducer.reproduce(bu);
                 } else {
                     File[] breakingUpdates = notReproducedDataDir.toFile().listFiles();
@@ -136,6 +143,33 @@ public class Main {
             } catch (IOException | InterruptedException e) {
                 throw new RuntimeException(e);
             }
+        }
+
+        private @NonNull DependencyUpdateReproducer getReproducer() throws IOException {
+            ResultManager resultManager = getResultManager();
+
+            return new DependencyUpdateReproducer(resultManager);
+        }
+
+        private @NonNull ResultManager getResultManager() throws IOException {
+            List<String> apiTokens = Files.readAllLines(apiTokenFile);
+            GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
+
+            GitHubManager gitHubManager = null;
+            if(!noPush) {
+                GitHubPackagesCredentials credentials = GitHubPackagesCredentials.fromJson(credentialsFile);
+                gitHubManager = new GitHubManager(tokenQueue, credentials);
+            }
+
+            WorkflowLogFinder workflowLogFinder = null;
+            if(workflowDir != null) {
+                workflowLogFinder = new WorkflowLogFinder(tokenQueue, chromeDriverPath, userDataDir, workflowDir);
+            }
+
+            DependencyRefLinkFinder dependencyRefLinkFinder = new DependencyRefLinkFinder(tokenQueue);
+
+            return new ResultManager(benchmarkDir, unsuccessfulReproductionsDir, notReproducedDataDir, logDir, jarDir,
+                    gitHubManager, workflowLogFinder, dependencyRefLinkFinder);
         }
     }
 }

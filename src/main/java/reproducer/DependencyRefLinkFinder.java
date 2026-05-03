@@ -1,6 +1,6 @@
 package reproducer;
 
-import miner.BreakingUpdate;
+import miner.DependencyUpdate;
 import miner.GitHubAPITokenQueue;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -41,20 +41,18 @@ public class DependencyRefLinkFinder {
     /**
      * Get the GitHub repo if it exists.
      */
-    public GHRepository getGithubRepository(BreakingUpdate bu) throws IOException {
+    public GHRepository getGithubRepository(DependencyUpdate bu) throws IOException {
 
         String repoOwner = bu.updatedDependency.dependencyGroupID.split("\\.").length > 1 ?
                 bu.updatedDependency.dependencyGroupID.split("\\.")[1] : bu.updatedDependency.dependencyGroupID;
         String repoName = repoOwner + "/" + bu.updatedDependency.dependencyArtifactID;
-        GHRepository repository = tokenQueue.getGitHub(httpConnector).getRepository(repoName);
-        return repository;
-
+        return tokenQueue.getGitHub(httpConnector).getRepository(repoName);
     }
 
     /**
      * Get the GitHub comparison links for the old and new tag releases if they exist.
      */
-    public String getGithubCompareLink(BreakingUpdate bu) {
+    public String getGithubCompareLink(DependencyUpdate bu) {
 
         try {
             GHRepository repository = getGithubRepository(bu);
@@ -64,7 +62,7 @@ public class DependencyRefLinkFinder {
             return (tags != null) ? ("https://github.com/%s/compare/%s...%s".formatted(repository.getName(), tags.get(0), tags.get(1)))
                     : notFoundMsg;
         } catch (IOException e) {
-            log.error("A GitHub repository could not be found for the updated dependency {}.", bu.breakingCommit);
+            log.error("A GitHub repository could not be found for the updated dependency {}.", bu.postCommit);
             return "A GitHub repository could not be found for the updated dependency.";
         }
     }
@@ -73,7 +71,7 @@ public class DependencyRefLinkFinder {
     /**
      * Get the old and new tag releases if they exist in GitHub.
      */
-    private List<String> getTags(GHRepository repository, BreakingUpdate bu) {
+    private List<String> getTags(GHRepository repository, DependencyUpdate bu) {
         try {
             PagedIterable<GHTag> allTags = repository.listTags();
             List<String> tags = allTags.toList().stream()
@@ -85,7 +83,7 @@ public class DependencyRefLinkFinder {
             return tags.size() == 2 ? tags : null;
         } catch (IOException e) {
             log.error("Tags were not found in the GitHub repository {} for the updated dependency {}.",
-                    repository.getName(), bu.breakingCommit, e);
+                    repository.getName(), bu.postCommit, e);
         }
         return null;
     }
@@ -93,7 +91,7 @@ public class DependencyRefLinkFinder {
     /**
      * Get the Maven source jar links for the old and new dependency releases if they exist.
      */
-    public List<String> getMavenSourceLinks(BreakingUpdate bu) {
+    public List<String> getMavenSourceLinks(DependencyUpdate bu) {
         String mavenSourceLinkBase = "https://repo1.maven.org/maven2/%s/%s/"
                 .formatted(bu.updatedDependency.dependencyGroupID.replaceAll("\\.", "/"),
                         bu.updatedDependency.dependencyArtifactID);
@@ -110,7 +108,7 @@ public class DependencyRefLinkFinder {
             if (prevSourceResponse.code() != 404 || newSourceResponse.code() != 404)
                 return List.of(prevVersionMavenSourceLink, newVersionMavenSourceLink);
         } catch (IOException e) {
-            log.error("Maven source links could not be found for the updated dependency {}.", bu.breakingCommit, e);
+            log.error("Maven source links could not be found for the updated dependency {}.", bu.postCommit, e);
         }
         return null;
     }

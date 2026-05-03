@@ -33,7 +33,7 @@ public class GitHubAPITokenQueue {
      */
     public GitHubAPITokenQueue(Collection<String> apiTokens) throws IOException {
         verifyTokens(apiTokens);
-        if (apiTokens.size() < 1)
+        if (apiTokens.isEmpty())
             throw new RuntimeException("No valid API tokens provided!");
         tokenQueue = new ConcurrentLinkedQueue<>(apiTokens);
     }

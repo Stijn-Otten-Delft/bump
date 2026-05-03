@@ -14,20 +14,20 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *
  * @author <a href="mailto:gabsko@kth.se">Gabriel Skoglund</a>
  */
-public class BreakingUpdateTest extends GitHubMinerTestBase {
+public class DependencyUpdateTest extends GitHubMinerTestBase {
 
-    static List<BreakingUpdate> breakingUpdates;
+    static List<DependencyUpdate> dependencyUpdates;
 
     @BeforeEach
     public void setUp() throws IOException {
-        if (breakingUpdates != null)
+        if (dependencyUpdates != null)
             return;
-        breakingUpdates = List.of(
-                new BreakingUpdate(gitHub.getRepository("alibaba/fastjson").getPullRequest(4233)),
-                new BreakingUpdate(gitHub.getRepository("orientechnologies/orientdb").getPullRequest(8118)),
-                new BreakingUpdate(gitHub.getRepository("pholser/junit-quickcheck").getPullRequest(499)),
-                new BreakingUpdate(gitHub.getRepository("feedzai/pdb").getPullRequest(342)),
-                new BreakingUpdate(gitHub.getRepository("INRIA/spoon").getPullRequest(4620))
+        dependencyUpdates = List.of(
+                new DependencyUpdate(gitHub.getRepository("alibaba/fastjson").getPullRequest(4233)),
+                new DependencyUpdate(gitHub.getRepository("orientechnologies/orientdb").getPullRequest(8118)),
+                new DependencyUpdate(gitHub.getRepository("pholser/junit-quickcheck").getPullRequest(499)),
+                new DependencyUpdate(gitHub.getRepository("feedzai/pdb").getPullRequest(342)),
+                new DependencyUpdate(gitHub.getRepository("INRIA/spoon").getPullRequest(4620))
         );
     }
 
@@ -40,8 +40,8 @@ public class BreakingUpdateTest extends GitHubMinerTestBase {
                 "mysql",
                 "org.bitbucket.mstrobel"
         );
-        for (int i = 0; i < breakingUpdates.size(); i++)
-            assertEquals(expected.get(i), breakingUpdates.get(i).updatedDependency.dependencyGroupID);
+        for (int i = 0; i < dependencyUpdates.size(); i++)
+            assertEquals(expected.get(i), dependencyUpdates.get(i).updatedDependency.dependencyGroupID);
     }
 
     @Test
@@ -53,8 +53,8 @@ public class BreakingUpdateTest extends GitHubMinerTestBase {
                 "mysql-connector-java",
                 "procyon-compilertools"
         );
-        for (int i = 0; i < breakingUpdates.size(); i++)
-            assertEquals(expected.get(i), breakingUpdates.get(i).updatedDependency.dependencyArtifactID);
+        for (int i = 0; i < dependencyUpdates.size(); i++)
+            assertEquals(expected.get(i), dependencyUpdates.get(i).updatedDependency.dependencyArtifactID);
     }
 
     @Test
@@ -66,8 +66,8 @@ public class BreakingUpdateTest extends GitHubMinerTestBase {
                 "5.1.49",
                 "0.5.36"
         );
-        for (int i = 0; i < breakingUpdates.size(); i++)
-            assertEquals(expected.get(i), breakingUpdates.get(i).updatedDependency.previousVersion);
+        for (int i = 0; i < dependencyUpdates.size(); i++)
+            assertEquals(expected.get(i), dependencyUpdates.get(i).updatedDependency.previousVersion);
     }
 
     @Test
@@ -79,8 +79,8 @@ public class BreakingUpdateTest extends GitHubMinerTestBase {
                 "8.0.28",
                 "0.6.0"
         );
-        for (int i = 0; i < breakingUpdates.size(); i++)
-            assertEquals(expected.get(i), breakingUpdates.get(i).updatedDependency.newVersion);
+        for (int i = 0; i < dependencyUpdates.size(); i++)
+            assertEquals(expected.get(i), dependencyUpdates.get(i).updatedDependency.newVersion);
     }
 
     @Test
@@ -92,8 +92,8 @@ public class BreakingUpdateTest extends GitHubMinerTestBase {
                 "major",
                 "minor"
         );
-        for (int i = 0; i < breakingUpdates.size(); i++)
-            assertEquals(expected.get(i), breakingUpdates.get(i).updatedDependency.versionUpdateType);
+        for (int i = 0; i < dependencyUpdates.size(); i++)
+            assertEquals(expected.get(i), dependencyUpdates.get(i).updatedDependency.versionUpdateType);
     }
 
     @Test
@@ -105,8 +105,8 @@ public class BreakingUpdateTest extends GitHubMinerTestBase {
                 "bot",
                 "bot"
         );
-        for (int i = 0; i < breakingUpdates.size(); i++)
-            assertEquals(expected.get(i), breakingUpdates.get(i).prAuthor);
+        for (int i = 0; i < dependencyUpdates.size(); i++)
+            assertEquals(expected.get(i), dependencyUpdates.get(i).prAuthor);
     }
 
     @Test
@@ -118,8 +118,8 @@ public class BreakingUpdateTest extends GitHubMinerTestBase {
                 "bot",
                 "human"
         );
-        for (int i = 0; i < breakingUpdates.size(); i++)
-            assertEquals(expected.get(i), breakingUpdates.get(i).preCommitAuthor);
+        for (int i = 0; i < dependencyUpdates.size(); i++)
+            assertEquals(expected.get(i), dependencyUpdates.get(i).preCommitAuthor);
     }
 
     @Test
@@ -131,7 +131,7 @@ public class BreakingUpdateTest extends GitHubMinerTestBase {
                 "bot",
                 "bot"
         );
-        for (int i = 0; i < breakingUpdates.size(); i++)
-            assertEquals(expected.get(i), breakingUpdates.get(i).breakingCommitAuthor);
+        for (int i = 0; i < dependencyUpdates.size(); i++)
+            assertEquals(expected.get(i), dependencyUpdates.get(i).postCommitAuthor);
     }
 }

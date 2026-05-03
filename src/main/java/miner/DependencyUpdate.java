@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
  *
  * @author <a href="mailto:gabsko@kth.se">Gabriel Skoglund</a>
  */
-public class BreakingUpdate {
+public class DependencyUpdate {
 
     private static final Pattern DEPENDENCY_ARTIFACT_ID =
             Pattern.compile("^\\s*<artifactId>(.*)</artifactId>\\s*$");
@@ -39,13 +39,13 @@ public class BreakingUpdate {
     public final String url;
     public final String project;
     public final String projectOrganisation;
-    public final String breakingCommit;
+    public final String postCommit;
     public final String prAuthor;
     public final String preCommitAuthor;
-    public final String breakingCommitAuthor;
+    public final String postCommitAuthor;
     public String licenseInfo;
     public final UpdatedDependency updatedDependency;
-    private static final Logger log = LoggerFactory.getLogger(BreakingUpdate.class);
+    private static final Logger log = LoggerFactory.getLogger(DependencyUpdate.class);
 
     /**
      * Create a new BreakingUpdate object that stores information about a
@@ -53,19 +53,19 @@ public class BreakingUpdate {
      *
      * @param pr a pull request that corresponds to a breaking dependency update.
      */
-    public BreakingUpdate(GHPullRequest pr) {
+    public DependencyUpdate(GHPullRequest pr) {
         url = pr.getHtmlUrl().toString();
         project = pr.getRepository().getName();
         projectOrganisation = url.split("/")[3];
-        breakingCommit = pr.getHead().getSha();
+        postCommit = pr.getHead().getSha();
         try {
             licenseInfo = pr.getRepository().getLicense().getName();
         } catch (IOException e) {
             licenseInfo = "unknown";
         }
         prAuthor = parsePRAuthorType(pr, "unknown");
-        preCommitAuthor = parsePreCommitAuthorType(pr.getRepository(), breakingCommit, "unknown");
-        breakingCommitAuthor = parseBreakingCommitAuthorType(pr.getRepository(), breakingCommit, "unknown");
+        preCommitAuthor = parsePreCommitAuthorType(pr.getRepository(), postCommit, "unknown");
+        postCommitAuthor = parseBreakingCommitAuthorType(pr.getRepository(), postCommit, "unknown");
         updatedDependency = new UpdatedDependency(pr);
     }
 
@@ -73,22 +73,22 @@ public class BreakingUpdate {
      * Constructor for loading a BreakingUpdate from a JSON file
      */
     @JsonCreator
-    BreakingUpdate(@JsonProperty("url") String url,
-                   @JsonProperty("project") String project,
-                   @JsonProperty("projectOrganisation") String organisation,
-                   @JsonProperty("breakingCommit") String breakingCommit,
-                   @JsonProperty("prAuthor") String prAuthor,
-                   @JsonProperty("preCommitAuthor") String preCommitAuthor,
-                   @JsonProperty("breakingCommitAuthor") String breakingCommitAuthor,
-                   @JsonProperty("updatedDependency") UpdatedDependency updatedDependency,
-                   @JsonProperty("licenseInfo") String licenseInfo) {
+    DependencyUpdate(@JsonProperty("url") String url,
+                     @JsonProperty("project") String project,
+                     @JsonProperty("projectOrganisation") String organisation,
+                     @JsonProperty("postCommit") String postCommit,
+                     @JsonProperty("prAuthor") String prAuthor,
+                     @JsonProperty("preCommitAuthor") String preCommitAuthor,
+                     @JsonProperty("postCommitAuthor") String postCommitAuthor,
+                     @JsonProperty("updatedDependency") UpdatedDependency updatedDependency,
+                     @JsonProperty("licenseInfo") String licenseInfo) {
         this.url = url;
         this.project = project;
         this.projectOrganisation = organisation;
-        this.breakingCommit = breakingCommit;
+        this.postCommit = postCommit;
         this.prAuthor = prAuthor;
         this.preCommitAuthor = preCommitAuthor;
-        this.breakingCommitAuthor = breakingCommitAuthor;
+        this.postCommitAuthor = postCommitAuthor;
         this.updatedDependency = updatedDependency;
         this.licenseInfo = licenseInfo;
     }
@@ -169,7 +169,7 @@ public class BreakingUpdate {
     public String toString() {
         return ("BreakingUpdate{url = %s, project = %s, projectOrganisation = %s, breakingCommit = %s prAuthor = %s, preCommitAuthor = %s, " +
                 "breakingCommitAuthor = %s}")
-                .formatted(url, project, projectOrganisation, breakingCommit, prAuthor, preCommitAuthor, breakingCommitAuthor);
+                .formatted(url, project, projectOrganisation, postCommit, prAuthor, preCommitAuthor, postCommitAuthor);
     }
 
 

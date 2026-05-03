@@ -1,6 +1,6 @@
 package miner;
 
-public class ReproducibleBreakingUpdate extends BreakingUpdate {
+public class ReproducibleDependencyUpdate extends DependencyUpdate {
 
     private static final String DEFAULT_JAVA_VERSION_FOR_REPRODUCTION = "11";
     public String preCommitReproductionCommand = null;
@@ -14,11 +14,11 @@ public class ReproducibleBreakingUpdate extends BreakingUpdate {
      * Create a new ReproducibleBreakingUpdate object that stores information about a
      * reproducible breaking dependency update.
      */
-    public ReproducibleBreakingUpdate(String url, String project, String projectOrganisation, String breakingCommit,
-                                      String prAuthor, String preCommitAuthor, String breakingCommitAuthor,
-                                      BreakingUpdate.UpdatedDependency updatedDependency, String githubCompareLink,
-                                      String mavenSourceLinkPre, String mavenSourceLinkBreaking,
-                                      UpdatedDependency.UpdatedFileType updatedFileType, String licenseInfo, String dependencyLicenseInfo, String githubRepoSlug) {
+    public ReproducibleDependencyUpdate(String url, String project, String projectOrganisation, String breakingCommit,
+                                        String prAuthor, String preCommitAuthor, String breakingCommitAuthor,
+                                        DependencyUpdate.UpdatedDependency updatedDependency, String githubCompareLink,
+                                        String mavenSourceLinkPre, String mavenSourceLinkBreaking,
+                                        UpdatedDependency.UpdatedFileType updatedFileType, String licenseInfo, String dependencyLicenseInfo, String githubRepoSlug) {
         super(url, project, projectOrganisation, breakingCommit, prAuthor, preCommitAuthor, breakingCommitAuthor, updatedDependency, licenseInfo);
         this.updatedDependency = new UpdatedDependency(updatedDependency.dependencyGroupID, updatedDependency.dependencyArtifactID,
                 updatedDependency.previousVersion, updatedDependency.newVersion, updatedDependency.dependencyScope,
@@ -126,18 +126,18 @@ public class ReproducibleBreakingUpdate extends BreakingUpdate {
         /**
          * There were test failures after updating the dependency, but not for the preceding commit.
          */
-        TEST_FAILURE;
+        TEST_FAILURE
     }
 
     /**
      * UpdatedDependency represents information associated with the updated dependency.
      */
-    public static class UpdatedDependency extends BreakingUpdate.UpdatedDependency {
+    public static class UpdatedDependency extends DependencyUpdate.UpdatedDependency {
 
-        public String githubCompareLink;
-        public String mavenSourceLinkPre;
-        public String mavenSourceLinkBreaking;
-        public UpdatedFileType updatedFileType;
+        public final String githubCompareLink;
+        public final String mavenSourceLinkPre;
+        public final String mavenSourceLinkBreaking;
+        public final UpdatedFileType updatedFileType;
         public final String licenseInfo;
         public final String githubRepoSlug;
 
