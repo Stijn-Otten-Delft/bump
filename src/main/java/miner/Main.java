@@ -89,8 +89,8 @@ public class Main {
         @CommandLine.Option(
                 names = {"-s", "--search-config"},
                 paramLabel = "SEARCH-CONFIG",
-                description = "A JSON file specifying details about the repositories to search for.",
-                required = true
+                description = "A JSON file specifying details about the repositories to search for, " +
+                        "it is required if there is no existing repository file provided."
         )
         Path searchConfigFile;
 
@@ -116,6 +116,10 @@ public class Main {
 
         @Override
         public void run() {
+            if(repoFile == null && outputDirectory == null) {
+                throw new IllegalArgumentException("Either '-o' or '-r' must be specified");
+            }
+
             if (repoFile == null) {
                 Path filePath = outputDirectory.resolve(GitHubMiner.FOUND_REPOS_FILE);
                 try {
