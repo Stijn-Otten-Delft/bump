@@ -85,12 +85,7 @@ public class DependencyUpdateReproducer {
         int prevAttemptCount = reproducibleSuccessOrFailure(bu, startedContainers, true);
 
         if (prevAttemptCount == 0) {
-            // no pre reproducibility
-            //todo look into storing this more explicitly for analysis
-
-            resultManager.saveUnsuccessfulReproductionResult(bu);
-            removeContainers(bu, startedContainers.values());
-            removeImages(bu, List.of("base"));
+            failReproduce(bu, startedContainers);
             return;
         }
 
@@ -100,12 +95,7 @@ public class DependencyUpdateReproducer {
         int postAttemptCount = reproducibleSuccessOrFailure(bu, startedContainers,  false);
 
         if (postAttemptCount == 0) {
-            // no post reproducibility
-            //todo look into storing this more explicitly for analysis
-
-            resultManager.saveUnsuccessfulReproductionResult(bu);
-            removeContainers(bu, startedContainers.values());
-            removeImages(bu, List.of("base"));
+            failReproduce(bu, startedContainers);
             return;
         }
 
@@ -146,6 +136,15 @@ public class DependencyUpdateReproducer {
         // cleanup
         removeContainers(bu, startedContainers.values());
         removeImages(bu, List.of("base", "pre", "post"));
+    }
+
+    private void failReproduce(DependencyUpdate du, Map<String, String> startedContainers) {
+        // no reproducibility
+        //todo look into storing this more explicitly for analysis
+
+        resultManager.saveUnsuccessfulReproductionResult(du);
+        removeContainers(du, startedContainers.values());
+        removeImages(du, List.of("base"));
     }
 
     /**
