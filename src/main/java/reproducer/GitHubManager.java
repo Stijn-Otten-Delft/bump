@@ -8,6 +8,7 @@ import com.github.dockerjava.core.command.PushImageResultCallback;
 import com.github.dockerjava.okhttp.OkDockerHttpClient;
 import miner.GitHubAPITokenQueue;
 import miner.ReproducibleDependencyUpdate;
+import miner.common.DockerConstants;
 import miner.common.GitConstants;
 import okhttp3.OkHttpClient;
 import org.kohsuke.github.*;
@@ -54,8 +55,8 @@ public class GitHubManager {
             AuthConfig authConfig = new AuthConfig()
                     .withUsername(registryCredentials.userName())
                     .withPassword(registryCredentials.identityToken())
-                    .withRegistryAddress(GitConstants.REPOSITORY);
-            client.pushImageCmd(GitConstants.REPOSITORY)
+                    .withRegistryAddress(DockerConstants.REPOSITORY);
+            client.pushImageCmd(DockerConstants.REPOSITORY)
                     .withTag(bu.postCommit + extraTag)
                     .withAuthConfig(authConfig)
                     .exec(new PushImageResultCallback())

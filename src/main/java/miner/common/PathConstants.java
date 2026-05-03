@@ -7,7 +7,6 @@ import java.nio.file.Paths;
  * Common constants used across the miner and reproducer projects.
  */
 public final class PathConstants {
-
     /**
      * The CACHE_DIR where the HTTP caches will be stored is set to the default system
      * temporary directory i.e. /tmp/ on most UNIX-like systems.
