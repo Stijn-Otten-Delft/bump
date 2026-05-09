@@ -122,6 +122,13 @@ public class Main {
         )
         boolean noPush;
 
+        @CommandLine.Option(
+                names = {"-v", "--volume"},
+                paramLabel = "VOLUME-NAME",
+                description = "A docker volume that contains the maven packages as to not redownload them constantly"
+        )
+        String cacheVolume;
+
         @Override
         public void run() {
             try {
@@ -148,7 +155,7 @@ public class Main {
         private @NonNull DependencyUpdateReproducer getReproducer() throws IOException {
             ResultManager resultManager = getResultManager();
 
-            return new DependencyUpdateReproducer(resultManager);
+            return new DependencyUpdateReproducer(resultManager, cacheVolume);
         }
 
         private @NonNull ResultManager getResultManager() throws IOException {

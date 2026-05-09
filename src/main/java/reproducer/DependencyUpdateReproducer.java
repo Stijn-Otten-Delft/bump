@@ -5,6 +5,9 @@ import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.PullImageResultCallback;
 import com.github.dockerjava.api.command.WaitContainerResultCallback;
 import com.github.dockerjava.api.exception.NotFoundException;
+import com.github.dockerjava.api.model.Bind;
+import com.github.dockerjava.api.model.HostConfig;
+import com.github.dockerjava.api.model.Volume;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
@@ -34,13 +37,16 @@ public class DependencyUpdateReproducer {
     private final ResultManager resultManager;
     private final DockerClient client;
 
+    private final String cacheVolume;
+
     /**
      * Set up a new BreakingUpdateReproducer creating new Docker images based on {@value miner.common.DockerConstants#BASE_IMAGE}
      *
      * @param resultManager the ResultManager that will store information about reproduction results.
      */
-    public DependencyUpdateReproducer(ResultManager resultManager) {
+    public DependencyUpdateReproducer(ResultManager resultManager, String cacheVolume) {
         this.resultManager = resultManager;
+        this.cacheVolume = cacheVolume;
         DockerClientConfig clientConfig = DefaultDockerClientConfig.createDefaultConfigBuilder()
                 .withRegistryUrl("https://hub.docker.com")
                 .build();
@@ -269,6 +275,18 @@ public class DependencyUpdateReproducer {
 
     /** Start a container for the given breaking update with a specific command */
     private String startContainer(DependencyUpdate bu, String cmd) {
+        if(cacheVolume != null) {
+            HostConfig hostConfig = HostConfig.newHostConfig()
+                    .withBinds(new Bind(cacheVolume, new Volume("/root/.m2")));
+            CreateContainerResponse container = client.createContainerCmd(bu.postCommit + ":base")
+                    .withWorkingDir("/" + bu.project)
+                    .withCmd("sh", "-c", cmd)
+                    .withHostConfig(hostConfig)
+                    .exec();
+            client.startContainerCmd(container.getId()).exec();
+            return container.getId();
+        }
+
         CreateContainerResponse container = client.createContainerCmd(bu.postCommit + ":base")
                 .withWorkingDir("/" + bu.project)
                 .withCmd("sh", "-c", cmd)
@@ -332,6 +350,7 @@ public class DependencyUpdateReproducer {
 
     /** Create new docker images for the previous and post commits of the given breaking update **/
     private String createImageForCommit(DependencyUpdate bu, String containerId, String extraTag) {
+        //todo maybe check if we used the volume and if so change that here, or maybe not I'm not 100% sure that that would be required"
         client.commitCmd(containerId).withRepository(bu.postCommit).withTag(extraTag).exec();
         CreateContainerResponse container = client.createContainerCmd(bu.postCommit + ":" + extraTag)
                 .withWorkingDir("/" + bu.project)
