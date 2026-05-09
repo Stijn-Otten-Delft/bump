@@ -1,12 +1,12 @@
 package miner.common;
 
 public final class DockerConstants {
-    public static final String BASE_IMAGE = "ghcr.io/chains-project/breaking-updates:base-image";
+    public static final String BASE_IMAGE = "ghcr.io/chains-project/breaking-updates:base-image-java-23";
 
     /**
      * The repository where the created images will be stored
      */
-    public static final String REPOSITORY = "ghcr.io/chains-project/breaking-updates";
+    public static final String REPOSITORY = "ghcr.io/Stijn/breaking-updates";
 
     /**
      * Tag that will be added as a suffix to breaking update containers containing the state of the repo

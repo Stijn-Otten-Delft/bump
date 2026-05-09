@@ -130,6 +130,8 @@ public class DependencyUpdateReproducer {
         if (previouslyFailed && postFailed) {
             // this is a dependency update that was broken before and after
             // todo change the way we store this
+            // todo maybe don't save this, this is just a broken project.
+            // todo save this someweher tho to debug this tool, as for example the previous time the problem was the java version
             resultManager.storeResult(bu, startedContainers.get("prevCommit"), startedContainers.get("postCommit"));
         }
 
