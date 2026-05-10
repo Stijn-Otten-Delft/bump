@@ -2,6 +2,7 @@ package miner.common;
 
 public final class DockerConstants {
     public static final String BASE_IMAGE = "ghcr.io/chains-project/breaking-updates:base-image-java-23";
+    public static final String DEFAULT_JAVA_VERSION_FOR_REPRODUCTION = "23";
 
     /**
      * The repository where the created images will be stored

@@ -1,6 +1,6 @@
 package miner;
 
-import miner.common.JavaConstants;
+import miner.common.DockerConstants;
 
 public class ReproducibleDependencyUpdate extends DependencyUpdate {
 
@@ -40,7 +40,7 @@ public class ReproducibleDependencyUpdate extends DependencyUpdate {
      * Set the default java version used in the reproduction process.
      */
     public void setJavaVersionUsedForReproduction() {
-        this.javaVersionUsedForReproduction = JavaConstants.DEFAULT_JAVA_VERSION_FOR_REPRODUCTION;
+        this.javaVersionUsedForReproduction = DockerConstants.DEFAULT_JAVA_VERSION_FOR_REPRODUCTION;
     }
 
     /**

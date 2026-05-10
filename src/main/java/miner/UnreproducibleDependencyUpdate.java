@@ -1,6 +1,6 @@
 package miner;
 
-import miner.common.JavaConstants;
+import miner.common.DockerConstants;
 
 public class UnreproducibleDependencyUpdate extends DependencyUpdate {
 
@@ -18,7 +18,7 @@ public class UnreproducibleDependencyUpdate extends DependencyUpdate {
 
     public UnreproducibleDependencyUpdate(DependencyUpdate bu){
         super(bu.url, bu.project, bu.projectOrganisation, bu.postCommit, bu.prAuthor, bu.preCommitAuthor, bu.postCommitAuthor, bu.updatedDependency, bu.licenseInfo);
-        this.javaVersionUsedForReproduction = JavaConstants.DEFAULT_JAVA_VERSION_FOR_REPRODUCTION;
+        this.javaVersionUsedForReproduction = DockerConstants.DEFAULT_JAVA_VERSION_FOR_REPRODUCTION;
     }
 
     public UnreproducibleDependencyUpdate(DependencyUpdate bu, String javaVersionUsedForReproduction){
@@ -39,6 +39,6 @@ public class UnreproducibleDependencyUpdate extends DependencyUpdate {
      * Set the default java version used in the reproduction process.
      */
     public void setJavaVersionUsedForReproduction() {
-        this.javaVersionUsedForReproduction = JavaConstants.DEFAULT_JAVA_VERSION_FOR_REPRODUCTION;
+        this.javaVersionUsedForReproduction = DockerConstants.DEFAULT_JAVA_VERSION_FOR_REPRODUCTION;
     }
 }
