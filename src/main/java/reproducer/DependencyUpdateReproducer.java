@@ -116,21 +116,27 @@ public class DependencyUpdateReproducer {
                 createImageForCommit(bu, startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1)),
                         "pre"));
 
+        String lastPostContainerId = startedContainers.get("postContainer%s".formatted(postAttemptCount - 1));
+        String lastPrevContainerId = startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1));
+
+
+        //TODO NOTE: make the storeresult also pass the latest prevcontainer and postcontainer for the actual depedency stuff (due to them not running if you don't do the github stuff)
+
         if (!previouslyFailed && postFailed) {
             // this is a breaking change
-            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"));
+            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId);
         }
 
         if (previouslyFailed && !postFailed) {
             // this is an unbreaking change
             //todo change the way we store this
-            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"));
+            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId);
         }
 
         if (!previouslyFailed && !postFailed) {
             // this is a non-breaking change
             // todo change the way we store this
-            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"));
+            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"),  lastPostContainerId, lastPrevContainerId);
         }
 
         if (previouslyFailed && postFailed) {
@@ -138,7 +144,7 @@ public class DependencyUpdateReproducer {
             // todo change the way we store this
             // todo maybe don't save this, this is just a broken project.
             // todo save this someweher tho to debug this tool, as for example the previous time the problem was the java version
-            resultManager.storeResult(bu, startedContainers.get("prevCommit"), startedContainers.get("postCommit"));
+            resultManager.storeResult(bu, startedContainers.get("prevCommit"), startedContainers.get("postCommit"),  lastPostContainerId, lastPrevContainerId);
         }
 
         // cleanup

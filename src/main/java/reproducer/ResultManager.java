@@ -136,7 +136,8 @@ public class ResultManager {
     /**
      * Store results when the reproduction is successful.
      */
-    public void storeResult(DependencyUpdate bu, String postContainerId, String prevContainerId) {
+    public void storeResult(DependencyUpdate bu, String postContainerId, String prevContainerId, String lastPostContainerId, String lastPrevContainerId) {
+        //todo this erally only works with a breaking failure rn due to it checking for a breking log file
         Path logOutputLocation = successfulReproductionLogDir.resolve(bu.postCommit + ".log");
 
         if(gitHubManager != null) {
@@ -154,6 +155,7 @@ public class ResultManager {
         String mavenSourceLinkPre = null;
         String mavenSourceLinkBreaking = null;
         String dependencyLicenseInfo = null;
+        //todo change these oders since their failures don't always imply eachothe
         try {
             githubCompareLink = dependencyRefLinkFinder.getGithubCompareLink(bu);
             githubSlug = dependencyRefLinkFinder.getGithubRepository(bu).getName();
@@ -167,7 +169,7 @@ public class ResultManager {
             log.error("Dependency reference links could not be fetched for the breaking update {}. Therefore, the " +
                     "reference links will be assigned null.", bu.postCommit, e);
         }
-        UpdatedFileType updateType = extractDependencies(bu, postContainerId, prevContainerId);
+        UpdatedFileType updateType = extractDependencies(bu, lastPostContainerId, lastPrevContainerId);
         // Create a new reproducible breaking update object.
         ReproducibleDependencyUpdate reproducibleDU = new ReproducibleDependencyUpdate(bu.url, bu.project, bu.projectOrganisation,
                 bu.postCommit, bu.prAuthor, bu.preCommitAuthor, bu.postCommitAuthor, bu.updatedDependency,
