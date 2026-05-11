@@ -49,22 +49,25 @@ public class DependencyRefLinkFinder {
         return tokenQueue.getGitHub(httpConnector).getRepository(repoName);
     }
 
+    public String getGithubCompareLink(DependencyUpdate bu) {
+        try{
+            GHRepository repository = getGithubRepository(bu);
+            return getGithubCompareLink(repository, bu);
+        }catch (IOException e){
+            log.error("A GitHub repository could not be found for the updated dependency {}.", bu.postCommit, e);
+            return "A GitHub repository could not be found for the updated dependency.";
+        }
+    }
+
     /**
      * Get the GitHub comparison links for the old and new tag releases if they exist.
      */
-    public String getGithubCompareLink(DependencyUpdate bu) {
-
-        try {
-            GHRepository repository = getGithubRepository(bu);
-            List<String> tags = getTags(repository, bu);
-            String notFoundMsg = "Relevant tags were not found in the GitHub repository %s for the updated dependency."
-                    .formatted(repository.getName());
-            return (tags != null) ? ("https://github.com/%s/compare/%s...%s".formatted(repository.getName(), tags.get(0), tags.get(1)))
-                    : notFoundMsg;
-        } catch (IOException e) {
-            log.error("A GitHub repository could not be found for the updated dependency {}.", bu.postCommit);
-            return "A GitHub repository could not be found for the updated dependency.";
-        }
+    public String getGithubCompareLink(GHRepository repository, DependencyUpdate bu) {
+        List<String> tags = getTags(repository, bu);
+        String notFoundMsg = "Relevant tags were not found in the GitHub repository %s for the updated dependency."
+                .formatted(repository.getName());
+        return (tags != null) ? ("https://github.com/%s/compare/%s...%s".formatted(repository.getName(), tags.get(0), tags.get(1)))
+                : notFoundMsg;
     }
     
 

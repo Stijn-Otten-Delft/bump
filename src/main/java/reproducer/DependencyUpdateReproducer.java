@@ -82,26 +82,26 @@ public class DependencyUpdateReproducer {
 
     /**
      * Attempt to reproduce the given breaking update.
-     * @param bu the breaking update to reproduce.
+     * @param du the breaking update to reproduce.
      */
-    public void reproduce(DependencyUpdate bu) throws InterruptedException {
-        createBaseImageForBreakingUpdate(bu);
+    public void reproduce(DependencyUpdate du) throws InterruptedException {
+        createBaseImageForBreakingUpdate(du);
         Map<String, String> startedContainers = new HashMap<>();
 
-        int prevAttemptCount = reproducibleSuccessOrFailure(bu, startedContainers, true);
+        int prevAttemptCount = reproducibleSuccessOrFailure(du, startedContainers, true);
 
         if (prevAttemptCount == 0) {
-            failReproduce(bu, startedContainers);
+            failReproduce(du, startedContainers);
             return;
         }
 
         boolean previouslyFailed = prevAttemptCount < 0;
         if (previouslyFailed) prevAttemptCount = -prevAttemptCount;
 
-        int postAttemptCount = reproducibleSuccessOrFailure(bu, startedContainers,  false);
+        int postAttemptCount = reproducibleSuccessOrFailure(du, startedContainers,  false);
 
         if (postAttemptCount == 0) {
-            failReproduce(bu, startedContainers);
+            failReproduce(du, startedContainers);
             return;
         }
 
@@ -110,10 +110,10 @@ public class DependencyUpdateReproducer {
 
         // we have a reproducible something, create their images
         startedContainers.put("postCommit",
-                createImageForCommit(bu, startedContainers.get("postContainer%s".formatted(postAttemptCount - 1)),
+                createImageForCommit(du, startedContainers.get("postContainer%s".formatted(postAttemptCount - 1)),
                         "post"));
         startedContainers.put("prevCommit",
-                createImageForCommit(bu, startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1)),
+                createImageForCommit(du, startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1)),
                         "pre"));
 
         String lastPostContainerId = startedContainers.get("postContainer%s".formatted(postAttemptCount - 1));
@@ -124,19 +124,19 @@ public class DependencyUpdateReproducer {
 
         if (!previouslyFailed && postFailed) {
             // this is a breaking change
-            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId);
+            resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId, previouslyFailed, postFailed);
         }
 
         if (previouslyFailed && !postFailed) {
             // this is an unbreaking change
             //todo change the way we store this
-            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId);
+            resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId, previouslyFailed, postFailed);
         }
 
         if (!previouslyFailed && !postFailed) {
             // this is a non-breaking change
             // todo change the way we store this
-            resultManager.storeResult(bu, startedContainers.get("postCommit"), startedContainers.get("prevCommit"),  lastPostContainerId, lastPrevContainerId);
+            resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"),  lastPostContainerId, lastPrevContainerId, previouslyFailed, postFailed);
         }
 
         if (previouslyFailed && postFailed) {
@@ -144,12 +144,13 @@ public class DependencyUpdateReproducer {
             // todo change the way we store this
             // todo maybe don't save this, this is just a broken project.
             // todo save this someweher tho to debug this tool, as for example the previous time the problem was the java version
-            resultManager.storeResult(bu, startedContainers.get("prevCommit"), startedContainers.get("postCommit"),  lastPostContainerId, lastPrevContainerId);
+            resultManager.saveUnsuccessfulReproductionResult(du);
+            //resultManager.storeResult(bu, startedContainers.get("prevCommit"), startedContainers.get("postCommit"),  lastPostContainerId, lastPrevContainerId);
         }
 
         // cleanup
-        removeContainers(bu, startedContainers.values());
-        removeImages(bu, List.of("base", "pre", "post"));
+        removeContainers(du, startedContainers.values());
+        removeImages(du, List.of("base", "pre", "post"));
     }
 
     private void failReproduce(DependencyUpdate du, Map<String, String> startedContainers) {
@@ -217,6 +218,8 @@ public class DependencyUpdateReproducer {
     }
 
     private int reproducibleFailure(DependencyUpdate bu, Map<String, String> startedContainers, boolean isPre) {
+        //if we every want both pre- and post-fail information the logging here needs to change to tag the logs with the pre- and post-tag
+
         int attemptCount;
         boolean isBuildSuccessfullyFailed = false;
         ReproducibleDependencyUpdate.FailureCategory prevFailure = null;
@@ -275,7 +278,7 @@ public class DependencyUpdateReproducer {
     /** Remove unwanted images created in intermediate steps when storing results for the breaking update **/
     private void removeImages(DependencyUpdate bu, List<String> extraTags) {
         for (String tag : extraTags) {
-            client.removeImageCmd(bu.postCommit + ":" + tag).exec();
+            client.removeImageCmd(bu.postCommit + ":" + tag).withForce(true).exec();
         }
     }
 

@@ -129,6 +129,13 @@ public class Main {
         )
         String cacheVolume;
 
+        @CommandLine.Option(
+                names = {"-di", "--delete-images"},
+                paramLabel = "DELETE-IMAGES",
+                description = "Set this flag if you want to delete the local images after running (really useful if you are already pushing the images to github)"
+        )
+        boolean deleteImages;
+
         @Override
         public void run() {
             try {
@@ -176,7 +183,7 @@ public class Main {
             DependencyRefLinkFinder dependencyRefLinkFinder = new DependencyRefLinkFinder(tokenQueue);
 
             return new ResultManager(benchmarkDir, unsuccessfulReproductionsDir, notReproducedDataDir, logDir, jarDir,
-                    gitHubManager, workflowLogFinder, dependencyRefLinkFinder);
+                    gitHubManager, deleteImages, workflowLogFinder, dependencyRefLinkFinder);
         }
     }
 }
