@@ -5,26 +5,27 @@ import miner.common.DockerConstants;
 public class ReproducibleDependencyUpdate extends DependencyUpdate {
 
     public String preCommitReproductionCommand = null;
-    public String breakingUpdateReproductionCommand = null;
-    public String javaVersionUsedForReproduction;
+    public String postUpdateReproductionCommand = null;
+    public String javaVersionUsedForReproduction = DockerConstants.DEFAULT_JAVA_VERSION_FOR_REPRODUCTION;
     public final UpdatedDependency updatedDependency;
-    private FailureCategory failureCategory;
+    private FailureCategory preFailureCategory;
+    private FailureCategory postFailureCategory;
     public String licenseInfo;
 
     /**
-     * Create a new ReproducibleBreakingUpdate object that stores information about a
-     * reproducible breaking dependency update.
+     * Create a new ReproducibleDependencyUpdate object that stores information about a
+     * reproducible dependency update.
      */
-    public ReproducibleDependencyUpdate(String url, String project, String projectOrganisation, String breakingCommit,
-                                        String prAuthor, String preCommitAuthor, String breakingCommitAuthor,
+    public ReproducibleDependencyUpdate(String url, String project, String projectOrganisation, String postCommit,
+                                        String prAuthor, String preCommitAuthor, String postCommitAuthor,
                                         DependencyUpdate.UpdatedDependency updatedDependency, String githubCompareLink,
-                                        String mavenSourceLinkPre, String mavenSourceLinkBreaking,
+                                        String mavenSourceLinkPre, String mavenSourceLinkPost,
                                         UpdatedDependency.UpdatedFileType updatedFileType, String licenseInfo, String dependencyLicenseInfo, String githubRepoSlug) {
-        super(url, project, projectOrganisation, breakingCommit, prAuthor, preCommitAuthor, breakingCommitAuthor, updatedDependency, licenseInfo);
+        super(url, project, projectOrganisation, postCommit, prAuthor, preCommitAuthor, postCommitAuthor, updatedDependency, licenseInfo);
         this.updatedDependency = new UpdatedDependency(updatedDependency.dependencyGroupID, updatedDependency.dependencyArtifactID,
                 updatedDependency.previousVersion, updatedDependency.newVersion, updatedDependency.dependencyScope,
                 updatedDependency.versionUpdateType, updatedDependency.dependencySection, githubCompareLink, mavenSourceLinkPre,
-                mavenSourceLinkBreaking, updatedFileType, dependencyLicenseInfo, githubRepoSlug);
+                mavenSourceLinkPost, updatedFileType, dependencyLicenseInfo, githubRepoSlug);
     }
 
     /**
@@ -44,57 +45,65 @@ public class ReproducibleDependencyUpdate extends DependencyUpdate {
     }
 
     /**
-     * Update preCommitReproductionCommand of this breaking update.
+     * Update preCommitReproductionCommand of this dependency update.
      *
-     * @param preCommitReproductionCommand the new preCommitReproductionCommand to add to this breaking update.
+     * @param preCommitReproductionCommand the new preCommitReproductionCommand to add to this dependency update.
      */
     public void setPreCommitReproductionCommand(String preCommitReproductionCommand) {
         this.preCommitReproductionCommand = preCommitReproductionCommand;
     }
 
     /**
-     * Get preCommitReproductionCommand of this breaking update.
+     * Get preCommitReproductionCommand of this dependency update.
      *
-     * @return preCommitReproductionCommand of this breaking update.
+     * @return preCommitReproductionCommand of this dependency update.
      */
     public String getPreCommitReproductionCommand() {
         return preCommitReproductionCommand;
     }
 
     /**
-     * Update failureCategory of this breaking update.
+     * Update failureCategory of this dependency update.
      *
-     * @param failureCategory the failureCategory to add to this breaking update.
+     * @param failureCategory the failureCategory to add to this dependency update.
      */
-    public void setFailureCategory(FailureCategory failureCategory) {
-        this.failureCategory = failureCategory;
+    public void setPostFailureCategory(FailureCategory failureCategory) {
+        this.postFailureCategory = failureCategory;
     }
 
     /**
-     * Get failureCategory of this breaking update.
+     * Get failureCategory of this dependency update.
      *
-     * @return failureCategory of this breaking update.
+     * @return failureCategory of this dependency update.
      */
-    public FailureCategory getFailureCategory() {
-        return failureCategory;
+    public FailureCategory getPostFailureCategory() {
+        return postFailureCategory;
+    }
+
+    public void setPreFailureCategory(FailureCategory preFailureCategory) {
+        this.preFailureCategory = preFailureCategory;
+    }
+
+    public FailureCategory getPreFailureCategory() {
+        return preFailureCategory;
     }
 
     /**
-     * Update breakingUpdateReproductionCommand of this breaking update.
+     * Update postUpdateReproductionCommand of this dependency update.
      *
-     * @param breakingUpdateReproductionCommand the new breakingUpdateReproductionCommand to add to this breaking update.
+     * @param postUpdateReproductionCommand the new postUpdateReproductionCommand to add to this dependency update.
      */
-    public void setBreakingUpdateReproductionCommand(String breakingUpdateReproductionCommand) {
-        this.breakingUpdateReproductionCommand = breakingUpdateReproductionCommand;
+    public void setPostUpdateReproductionCommand(String postUpdateReproductionCommand) {
+        this.postUpdateReproductionCommand = postUpdateReproductionCommand;
     }
 
     /**
-     * Get breakingUpdateReproductionCommand of this breaking update.
+     * Get postUpdateReproductionCommand of this dependency update.
      *
-     * @return breakingUpdateReproductionCommand of this breaking update.
+     * @return postUpdateReproductionCommand of this dependency update.
      */
-    public String getBreakingUpdateReproductionCommand() {
-        return breakingUpdateReproductionCommand;
+    public String getPostUpdateReproductionCommand() {
+        return postUpdateReproductionCommand;
     }
 
     /**
@@ -137,23 +146,23 @@ public class ReproducibleDependencyUpdate extends DependencyUpdate {
 
         public final String githubCompareLink;
         public final String mavenSourceLinkPre;
-        public final String mavenSourceLinkBreaking;
+        public final String mavenSourceLinkPost;
         public final UpdatedFileType updatedFileType;
         public final String licenseInfo;
         public final String githubRepoSlug;
 
         /**
-         * Create updated dependency for the breaking update.
+         * Create updated dependency for the dependency update.
          */
         public UpdatedDependency(String dependencyGroupID, String dependencyArtifactID, String previousVersion,
                                  String newVersion, String dependencyScope, String versionUpdateType, String dependencySection,
-                                 String githubCompareLink, String mavenSourceLinkPre, String mavenSourceLinkBreaking,
+                                 String githubCompareLink, String mavenSourceLinkPre, String mavenSourceLinkPost,
                                  UpdatedFileType updatedFileType, String licenseInfo, String githubRepoSlug) {
             super(dependencyGroupID, dependencyArtifactID, previousVersion, newVersion, dependencyScope, versionUpdateType,
                     dependencySection);
             this.githubCompareLink = githubCompareLink;
             this.mavenSourceLinkPre = mavenSourceLinkPre;
-            this.mavenSourceLinkBreaking = mavenSourceLinkBreaking;
+            this.mavenSourceLinkPost = mavenSourceLinkPost;
             this.updatedFileType = updatedFileType;
             this.licenseInfo = licenseInfo;
             this.githubRepoSlug = githubRepoSlug;
