@@ -22,6 +22,11 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The BreakingUpdateReproducer class attempts to reproduce breaking updates in a container.
@@ -38,15 +43,17 @@ public class DependencyUpdateReproducer {
     private final DockerClient client;
 
     private final String cacheVolume;
+    private final Integer parallel;
 
     /**
      * Set up a new BreakingUpdateReproducer creating new Docker images based on {@value miner.common.DockerConstants#BASE_IMAGE}
      *
      * @param resultManager the ResultManager that will store information about reproduction results.
      */
-    public DependencyUpdateReproducer(ResultManager resultManager, String cacheVolume) {
+    public DependencyUpdateReproducer(ResultManager resultManager, String cacheVolume, Integer parallel) {
         this.resultManager = resultManager;
         this.cacheVolume = cacheVolume;
+        this.parallel = parallel;
         DockerClientConfig clientConfig = DefaultDockerClientConfig.createDefaultConfigBuilder()
                 .withRegistryUrl("https://hub.docker.com")
                 .build();
@@ -67,17 +74,91 @@ public class DependencyUpdateReproducer {
 
     /**
      * Iterate through a list of breaking updates and attempt to reproduce if not already attempted.
-     * @param breakingUpdates the list of breaking updates to reproduce.
+     * Uses a fixed thread pool for efficient parallel execution of I/O-bound reproduction tasks.
+     * @param dependencyUpdates the list of breaking updates to reproduce.
      */
-    public void reproduceAll(File[] breakingUpdates) {
-        for (File breakingUpdate : breakingUpdates) {
-            try {
-                DependencyUpdate bu = JsonUtils.readFromFile(breakingUpdate.toPath(), DependencyUpdate.class);
-                reproduce(bu);
-            } catch (RuntimeException | InterruptedException e) {
-                log.error("An exception occurred while reproducing the breaking update in {}", breakingUpdate.getName(), e);
+    public void reproduceAll(File[] dependencyUpdates) {
+        var list = getDependencyUpdates(dependencyUpdates);
+
+        if(parallel != null) {
+            reproduceParallel(list);
+        }
+
+        else {
+            int total = list.size();
+            int done = 0;
+
+            for (var breakingUpdate : list) {
+                reproduceOne(breakingUpdate);
+
+                done++;
+                log.info("Completed {}/{} reproduction tasks", done, total);
             }
         }
+    }
+
+    private void reproduceParallel(List<DependencyUpdate> dependencyUpdates){
+        ExecutorService executorService = Executors.newFixedThreadPool(parallel);
+        CountDownLatch latch = new CountDownLatch(dependencyUpdates.size());
+        AtomicInteger completed = new AtomicInteger(0);
+        int total = dependencyUpdates.size();
+
+        log.info("Starting parallel reproduction of {} dependency updates with {} threads", total, parallel);
+
+        for (DependencyUpdate breakingUpdate : dependencyUpdates) {
+            executorService.submit(() -> {
+                try {
+                    reproduceOne(breakingUpdate);
+                } finally {
+                    int done = completed.incrementAndGet();
+                    log.info("Completed {}/{} reproduction tasks", done, total);
+                    latch.countDown();
+                }
+            });
+        }
+
+        try {
+            latch.await();
+            log.info("All {} reproduction tasks completed", total);
+        } catch (InterruptedException e) {
+            log.error("Interrupted while waiting for all reproduction tasks to complete", e);
+            Thread.currentThread().interrupt();
+        } finally {
+            executorService.shutdown();
+            try {
+                if (!executorService.awaitTermination(60, TimeUnit.SECONDS)) {
+                    log.warn("Executor service did not terminate within timeout, forcing shutdown");
+                    executorService.shutdownNow();
+                }
+            } catch (InterruptedException e) {
+                log.error("Interrupted while waiting for executor service to terminate", e);
+                executorService.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
+
+    private void reproduceOne(DependencyUpdate dependencyUpdate){
+        try{
+             reproduce(dependencyUpdate);
+        }  catch (RuntimeException | InterruptedException e) {
+            log.error("An exception occurred while reproducing the dependency in {}", dependencyUpdate.postCommit, e);
+        }
+    }
+
+    private List<DependencyUpdate> getDependencyUpdates(File[] dependencyUpdates){
+        var updateList = new ArrayList<DependencyUpdate>(dependencyUpdates.length);
+
+        for (File dependencyUpdate : dependencyUpdates) {
+            try {
+                DependencyUpdate du = JsonUtils.readFromFile(dependencyUpdate.toPath(), DependencyUpdate.class);
+                updateList.add(du);
+            } catch (RuntimeException e) {
+                log.error("An exception occurred while converting the json to class in {}", dependencyUpdate.getName(), e);
+            }
+        }
+
+        return updateList;
     }
 
     /**
@@ -120,25 +201,6 @@ public class DependencyUpdateReproducer {
         String lastPrevContainerId = startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1));
 
 
-        //TODO NOTE: make the storeresult also pass the latest prevcontainer and postcontainer for the actual depedency stuff (due to them not running if you don't do the github stuff)
-
-        if (!previouslyFailed && postFailed) {
-            // this is a breaking change
-            resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId, previouslyFailed, postFailed);
-        }
-
-        if (previouslyFailed && !postFailed) {
-            // this is an unbreaking change
-            //todo change the way we store this
-            resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId, previouslyFailed, postFailed);
-        }
-
-        if (!previouslyFailed && !postFailed) {
-            // this is a non-breaking change
-            // todo change the way we store this
-            resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"),  lastPostContainerId, lastPrevContainerId, previouslyFailed, postFailed);
-        }
-
         if (previouslyFailed && postFailed) {
             // this is a dependency update that was broken before and after
             // todo change the way we store this
@@ -146,6 +208,8 @@ public class DependencyUpdateReproducer {
             // todo save this someweher tho to debug this tool, as for example the previous time the problem was the java version
             resultManager.saveUnsuccessfulReproductionResult(du);
             //resultManager.storeResult(bu, startedContainers.get("prevCommit"), startedContainers.get("postCommit"),  lastPostContainerId, lastPrevContainerId);
+        }else{
+            resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId, previouslyFailed, postFailed);
         }
 
         // cleanup
@@ -168,18 +232,12 @@ public class DependencyUpdateReproducer {
      */
     private int reproducibleSuccessOrFailure(DependencyUpdate bu, Map<String, String> startedContainers, boolean isPre) {
         int attemptCountSuccess = reproducibleSuccess(bu, startedContainers, isPre);
+        if (attemptCountSuccess != -1) return attemptCountSuccess;
+
         int attemptCountFailure = reproducibleFailure(bu, startedContainers, isPre);
+        if(attemptCountFailure != -1) return -attemptCountFailure;
 
-        if(attemptCountSuccess == -1 && attemptCountFailure == -1)
-            return 0;
-
-        if (attemptCountSuccess != -1 && attemptCountFailure != -1)
-            throw new RuntimeException("This should not happen, we should not have both a reproducible success and a reproducible failure for the same commit");
-
-        if (attemptCountSuccess != -1)
-            return attemptCountSuccess;
-
-        return -attemptCountFailure;
+        return 0;
     }
 
     private int reproducibleSuccess(DependencyUpdate bu, Map<String, String> startedContainers, boolean isPre){
@@ -196,10 +254,26 @@ public class DependencyUpdateReproducer {
         for (attemptCount = 1; attemptCount < 4; attemptCount++) {
             log.info("Attempting for the {} time to compile and test if the {} commit of breaking update {} is successful",
                     attemptCount, preOrPost, bu.postCommit);
-            startedContainers.put(containerName.formatted(attemptCount), startContainer(bu, containerCommand));
-            WaitContainerResultCallback result = client.waitContainerCmd(startedContainers.get(containerName
-                            .formatted(attemptCount)))
-                    .exec(new WaitContainerResultCallback());
+
+            WaitContainerResultCallback result;
+
+            if(attemptCount == 1) {
+                // easy way to synchronize this part
+                // it needs to synchronize since the first run might write to the maven cache docker volume
+                synchronized (this){
+                    String containerId = startContainer(bu, containerCommand);
+                    startedContainers.put(containerName.formatted(attemptCount), containerId);
+
+                    result = client.waitContainerCmd(containerId).exec(new WaitContainerResultCallback());
+                }
+            }else{
+                String containerId = startContainer(bu, containerCommand);
+                startedContainers.put(containerName.formatted(attemptCount), containerId);
+
+                result = client.waitContainerCmd(containerId).exec(new WaitContainerResultCallback());
+            }
+
+
             if (result.awaitStatusCode().intValue() != EXIT_CODE_OK) {
                 log.info("Build failed for the {} commit of {} in the {} attempt.", preOrPost, bu.postCommit, attemptCount);
                 break;
@@ -234,9 +308,11 @@ public class DependencyUpdateReproducer {
         for (attemptCount = 1; attemptCount < 4; attemptCount++) {
             log.info("Attempting for the {} time to compile and test failure of {} update {}", attemptCount, preOrPost, bu.postCommit);
 
-            startedContainers.put(containerName.formatted(attemptCount), startContainer(bu, containerCommand));
-            WaitContainerResultCallback result = client.waitContainerCmd(startedContainers.get(containerName
-                    .formatted(attemptCount))).exec(new WaitContainerResultCallback());
+            String containerId = startContainer(bu, containerCommand);
+            startedContainers.put(containerName.formatted(attemptCount), containerId);
+
+            WaitContainerResultCallback result = client.waitContainerCmd(containerId)
+                    .exec(new WaitContainerResultCallback());
 
             if (result.awaitStatusCode().intValue() != EXIT_CODE_OK) {
                 newFailure = resultManager.getFailure(bu,

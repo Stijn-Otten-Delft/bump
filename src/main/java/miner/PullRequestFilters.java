@@ -22,6 +22,8 @@ public class PullRequestFilters {
             Pattern.compile("<dependency>(.*^[+-]\\s*<version>.+</version>.*){2}</dependency>",
                        Pattern.DOTALL | Pattern.MULTILINE);
 
+
+    //todo I would be interested in dependency updates with multiple file changes too tbh
     /**
      * Check whether a given pull request fulfills all of these properties:
      * <ul>

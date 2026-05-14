@@ -34,7 +34,8 @@ public class ResultManager {
     private final DockerClient client;
     private final Path benchmarkDir;
     private final Path unsuccessfulReproductionDir;
-    private final Path notReproducedDataDir;
+    private final Path notYetReproducedDataDir;
+    private final Path alreadyReproducedDataDir;
     private final Path jarDir;
     private final boolean deleteImages;
 
@@ -71,14 +72,15 @@ public class ResultManager {
      *                                    be written.
      * @param unsuccessfulReproductionDir the directory where unsuccessful breaking update reproduction JSON files
      *                                    should be written.
-     * @param notReproducedDataDir        the directory where not reproduced candidate breaking update files are located.
+     * @param notYetReproducedDataDir        the directory where not reproduced candidate breaking update files are located.
      * @param logDir                      the directory where maven logs should be stored.
      * @param jarDir                      the directory where jar files corresponding to changed dependencies should be
      *                                    stored.
      */
-    public ResultManager(Path benchmarkDir, Path unsuccessfulReproductionDir, Path notReproducedDataDir,
-                         Path logDir, Path jarDir, GitHubManager gitHubManager, Boolean deleteImages,
-                         WorkflowLogFinder workflowLogFinder, DependencyRefLinkFinder dependencyRefLinkFinder) {
+    public ResultManager(Path benchmarkDir, Path unsuccessfulReproductionDir, Path notYetReproducedDataDir,
+                         Path alreadyReproducedDataDir, Path logDir, Path jarDir, GitHubManager gitHubManager,
+                         Boolean deleteImages, WorkflowLogFinder workflowLogFinder,
+                         DependencyRefLinkFinder dependencyRefLinkFinder) {
         this.gitHubManager = gitHubManager;
         this.deleteImages = deleteImages;
         this.workflowLogFinder = workflowLogFinder;
@@ -88,7 +90,8 @@ public class ResultManager {
                 new OkDockerHttpClient.Builder().dockerHost(config.getDockerHost()).build());
         this.benchmarkDir = benchmarkDir;
         this.unsuccessfulReproductionDir = unsuccessfulReproductionDir;
-        this.notReproducedDataDir = notReproducedDataDir;
+        this.notYetReproducedDataDir = notYetReproducedDataDir;
+        this.alreadyReproducedDataDir = alreadyReproducedDataDir;
         this.jarDir = jarDir;
         successfulReproductionLogDir = logDir.resolve("successfulReproductionLogs");
         unsuccessfulReproductionLogDir = logDir.resolve("unsuccessfulReproductionLogs");
@@ -155,19 +158,21 @@ public class ResultManager {
         String mavenSourceLinkBreaking = null;
         String dependencyLicenseInfo = null;
 
-        try{
-            GHRepository repository = dependencyRefLinkFinder.getGithubRepository(du);
-            githubCompareLink = dependencyRefLinkFinder.getGithubCompareLink(repository, du);
-            githubSlug = repository.getName();
-            dependencyLicenseInfo = repository.getLicense().getName();
-        } catch (IOException e){
-            log.error("Could not get GH repository for {}", du.postCommit); //todo make this log more obvious what github we were trying to find
-        }
+        synchronized (this) {
+            try {
+                GHRepository repository = dependencyRefLinkFinder.getGithubRepository(du);
+                githubCompareLink = dependencyRefLinkFinder.getGithubCompareLink(repository, du);
+                githubSlug = repository.getName();
+                dependencyLicenseInfo = repository.getLicense().getName();
+            } catch (IOException e) {
+                log.error("Could not get GH repository for {}", du.postCommit); //todo make this log more obvious what github we were trying to find
+            }
 
-        List<String> mavenSourceLinks = dependencyRefLinkFinder.getMavenSourceLinks(du);
-        if (mavenSourceLinks != null) {
-            mavenSourceLinkPre = mavenSourceLinks.get(0);
-            mavenSourceLinkBreaking = mavenSourceLinks.get(1);
+            List<String> mavenSourceLinks = dependencyRefLinkFinder.getMavenSourceLinks(du);
+            if (mavenSourceLinks != null) {
+                mavenSourceLinkPre = mavenSourceLinks.get(0);
+                mavenSourceLinkBreaking = mavenSourceLinks.get(1);
+            }
         }
 
         UpdatedFileType updateType = extractDependencies(du, lastPostContainerId, lastPrevContainerId);
@@ -181,7 +186,11 @@ public class ResultManager {
 
 
         // Delete the BreakingUpdateJSON data from the in-progress-reproductions directory.
-        //removeBreakingUpdateFile(du);
+        if(alreadyReproducedDataDir != null) {
+            moveDependencyUpdateFile(du);
+        } else {
+            removeBreakingUpdateFile(du);
+        }
 
         //set the failure category if it exists
         if(preFail || postFail) {
@@ -313,9 +322,20 @@ public class ResultManager {
      */
     public void removeBreakingUpdateFile(DependencyUpdate bu) {
         log.info("Removing the JSON file from the in-progress-reproductions directory.");
-        boolean isRemovingSuccessful = notReproducedDataDir.resolve(bu.postCommit + JsonUtils.JSON_FILE_ENDING)
+        boolean isRemovingSuccessful = notYetReproducedDataDir.resolve(bu.postCommit + JsonUtils.JSON_FILE_ENDING)
                 .toFile().delete();
         if (!isRemovingSuccessful) log.error("Could not remove the JSON file from the in-progress-reproductions directory.");
+    }
+
+    public void moveDependencyUpdateFile(DependencyUpdate bu) {
+        log.info("Moving the JSON file from the in-progress-reproductions directory.");
+        Path sourcePath = notYetReproducedDataDir.resolve(bu.postCommit + JsonUtils.JSON_FILE_ENDING);
+        Path targetPath = alreadyReproducedDataDir.resolve(bu.postCommit + JsonUtils.JSON_FILE_ENDING);
+        try {
+            Files.move(sourcePath, targetPath);
+        } catch (IOException e) {
+            log.error("Could not move the JSON file to the already-reproduced directory for breaking update {}", bu.postCommit);
+        }
     }
 
     /**

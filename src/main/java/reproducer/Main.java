@@ -53,11 +53,11 @@ public class Main {
 
         @CommandLine.Option(
                 names = {"-d", "--in-progress-reproductions-dir"},
-                paramLabel = "NOT-REPRODUCED-DATA-DIR",
+                paramLabel = "NOT-YET-REPRODUCED-DATA-DIR",
                 description = "The directory where in-progress candidate breaking update files are located.",
                 required = true
         )
-        Path notReproducedDataDir;
+        Path notYetReproducedDataDir;
 
         @CommandLine.Option(
                 names = {"-l", "--log-dir"},
@@ -136,6 +136,21 @@ public class Main {
         )
         boolean deleteImages;
 
+        @CommandLine.Option(
+                names = {"-prl", "--parallel"},
+                paramLabel = "PARALLEL",
+                description = "Set this flag if you want to reproduce the breaking updates in parallel and with how many threads."
+        )
+        Integer parallel;
+
+        @CommandLine.Option(
+                names = {"-rdd", "--reproduction-data-dir"},
+                paramLabel = "REPRODUCTION-DATA-DIR",
+                description = "The directory where in-progress candidate breaking update files are located will be moved to" +
+                        "If this is not set the files will be deleted after a successful reproduction instead"
+        )
+        Path reproductionDataDir;
+
         @Override
         public void run() {
             try {
@@ -149,7 +164,7 @@ public class Main {
                     DependencyUpdate bu = JsonUtils.readFromFile(breakingUpdateFile, DependencyUpdate.class);
                     reproducer.reproduce(bu);
                 } else {
-                    File[] breakingUpdates = notReproducedDataDir.toFile().listFiles();
+                    File[] breakingUpdates = notYetReproducedDataDir.toFile().listFiles();
                     if (breakingUpdates != null && breakingUpdates.length > 0) {
                         reproducer.reproduceAll(breakingUpdates);
                     }
@@ -162,7 +177,7 @@ public class Main {
         private @NonNull DependencyUpdateReproducer getReproducer() throws IOException {
             ResultManager resultManager = getResultManager();
 
-            return new DependencyUpdateReproducer(resultManager, cacheVolume);
+            return new DependencyUpdateReproducer(resultManager, cacheVolume, parallel);
         }
 
         private @NonNull ResultManager getResultManager() throws IOException {
@@ -182,8 +197,8 @@ public class Main {
 
             DependencyRefLinkFinder dependencyRefLinkFinder = new DependencyRefLinkFinder(tokenQueue);
 
-            return new ResultManager(benchmarkDir, unsuccessfulReproductionsDir, notReproducedDataDir, logDir, jarDir,
-                    gitHubManager, deleteImages, workflowLogFinder, dependencyRefLinkFinder);
+            return new ResultManager(benchmarkDir, unsuccessfulReproductionsDir, notYetReproducedDataDir, reproductionDataDir,
+                    logDir, jarDir, gitHubManager, deleteImages, workflowLogFinder, dependencyRefLinkFinder);
         }
     }
 }
