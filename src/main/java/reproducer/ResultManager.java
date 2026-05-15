@@ -325,12 +325,12 @@ public class ResultManager {
 
     public void moveDependencyUpdateFile(DependencyUpdate bu, String subDir) {
         log.info("Moving the JSON file from the in-progress-reproductions directory.");
-        Path sourcePath = notYetReproducedDataDir.resolve(subDir).resolve(bu.postCommit + JsonUtils.JSON_FILE_ENDING);
+        Path sourcePath = notYetReproducedDataDir.resolve(bu.postCommit + JsonUtils.JSON_FILE_ENDING);
         Path targetPath = alreadyReproducedDataDir.resolve(subDir).resolve(bu.postCommit + JsonUtils.JSON_FILE_ENDING);
         try {
             Files.move(sourcePath, targetPath);
         } catch (IOException e) {
-            log.error("Could not move the JSON file to the already-reproduced directory for breaking update {}", bu.postCommit);
+            log.error("Could not move the JSON file to the already-reproduced directory for breaking update {}", bu.postCommit, e);
         }
     }
 

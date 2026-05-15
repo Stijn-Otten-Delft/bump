@@ -245,7 +245,7 @@ public class DependencyUpdateReproducer {
 
         // Try running tests 3 times for the previous commit to ensure that the build is reproducible.
         for (attemptCount = 1; attemptCount < 4; attemptCount++) {
-            log.info("Attempting for the {} time to compile and test if the {} commit of breaking update {} is successful",
+            log.info("Attempting for the {} time see if {} update {} passes the build and tests",
                     attemptCount, preOrPost, bu.postCommit);
 
             WaitContainerResultCallback result;
@@ -268,7 +268,7 @@ public class DependencyUpdateReproducer {
 
 
             if (result.awaitStatusCode().intValue() != EXIT_CODE_OK) {
-                log.info("Build failed for the {} commit of {} in the {} attempt.", preOrPost, bu.postCommit, attemptCount);
+                log.info("Build or test failed for the {} commit of {} in the {} attempt.", preOrPost, bu.postCommit, attemptCount);
                 break;
             } else {
                 if (attemptCount > 2) {
@@ -299,7 +299,7 @@ public class DependencyUpdateReproducer {
 
         // Try running tests 3 times to ensure that the breakage is reproducible.
         for (attemptCount = 1; attemptCount < 4; attemptCount++) {
-            log.info("Attempting for the {} time to compile and test failure of {} update {}", attemptCount, preOrPost, du.postCommit);
+            log.info("Attempting for the {} time to see if {} update {} fails the build and tests", attemptCount, preOrPost, du.postCommit);
 
             String containerId = startContainer(du, containerCommand);
             startedContainers.put(containerName.formatted(attemptCount), containerId);
@@ -315,15 +315,15 @@ public class DependencyUpdateReproducer {
                             startedContainers.get(containerName.formatted(attemptCount)), isPre);
                 }
                 else if (!newFailure.equals(prevFailure)) {
-                    log.info("Build has failed due to a different reason in the {} attempt than in the previous attempt."
-                            , attemptCount);
+                    log.info("Build of {} commit {} has failed due to a different reason in the {} attempt than in the previous attempt."
+                            , preOrPost, du.postCommit, attemptCount);
                     if (attemptCount > 1) failureLogManager.removeLogFile(du, isPre);
                     break;
                 } else if (attemptCount > 2) {
                     isBuildSuccessfullyFailed = true;
                 }
             } else {
-                log.info("Breaking commit did not fail in the {} attempt.", attemptCount);
+                log.info("{} commit {} did not fail in the {} attempt.", preOrPost, du.postCommit, attemptCount);
                 // Remove the log file saved in the successful directory in the previous attempts.
                 if (attemptCount > 1) failureLogManager.removeLogFile(du, isPre);
                 break;
