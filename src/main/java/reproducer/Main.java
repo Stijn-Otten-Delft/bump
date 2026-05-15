@@ -36,17 +36,9 @@ public class Main {
         Path apiTokenFile;
 
         @CommandLine.Option(
-                names = {"-b", "--benchmark-dir"},
-                paramLabel = "BENCHMARK-DIR",
-                description = "The directory where successful breaking update reproduction information should be written.",
-                required = true
-        )
-        Path benchmarkDir;
-
-        @CommandLine.Option(
                 names = {"-u", "--unsuccessful-reproductions-dir"},
                 paramLabel = "UNSUCCESSFUL-REPRODUCTIONS-DIR",
-                description = "The directory where unsuccessful breaking update reproduction information should be written.",
+                description = "The directory where unsuccessful dependency update reproduction information should be written.",
                 required = true
         )
         Path unsuccessfulReproductionsDir;
@@ -151,6 +143,39 @@ public class Main {
         )
         Path reproductionDataDir;
 
+        // 3 new paths -rdb -rdf and -rdn, representing breaking change reproduction, fixing change, and no change
+        @CommandLine.Option(
+                names = {"-rdb", "--reproduction-breaking-dir"},
+                paramLabel = "REPRODUCTION-BREAKING-DIR",
+                description = "The directory where the reproducible breaking dependency update files are stored",
+                required = true
+        )
+        Path reproductionBreakingDir;
+
+        @CommandLine.Option(
+                names = {"-rdf", "--reproduction-fixing-dir"},
+                paramLabel = "REPRODUCTION-FIXING-DIR",
+                description = "The directory where the reproducible fixing dependency update files are stored",
+                required = true
+        )
+        Path reproductionFixingDir;
+
+        @CommandLine.Option(
+                names = {"-rdn", "--reproduction-no-change-dir"},
+                paramLabel = "REPRODUCTION-NO-CHANGE-DIR",
+                description = "The directory where the reproducible non breaking non fixing dependency update files are stored",
+                required = true
+        )
+        Path reproductionNoChangeDir;
+
+        // always failing path, if not set they won't be stored and wont be made into images
+        @CommandLine.Option(
+                names = {"-rdf", "--reproduction-always-fail-dir"},
+                paramLabel = "REPRODUCTION-ALWAYS-FAIL-DIR",
+                description = "The directory where the always failing dependency update files are stored, if this is not set they won't be stored (nor their images)"
+        )
+        Path reproductionAlwaysFailDir;
+
         @Override
         public void run() {
             try {
@@ -175,12 +200,13 @@ public class Main {
         }
 
         private @NonNull DependencyUpdateReproducer getReproducer() throws IOException {
-            ResultManager resultManager = getResultManager();
+            FailureLogManager failureLogManager = new FailureLogManager(logDir);
+            ResultManager resultManager = getResultManager(failureLogManager);
 
-            return new DependencyUpdateReproducer(resultManager, cacheVolume, parallel);
+            return new DependencyUpdateReproducer(resultManager, failureLogManager, cacheVolume, parallel);
         }
 
-        private @NonNull ResultManager getResultManager() throws IOException {
+        private @NonNull ResultManager getResultManager(FailureLogManager failureLogManager) throws IOException {
             List<String> apiTokens = Files.readAllLines(apiTokenFile);
             GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
 
@@ -197,8 +223,9 @@ public class Main {
 
             DependencyRefLinkFinder dependencyRefLinkFinder = new DependencyRefLinkFinder(tokenQueue);
 
-            return new ResultManager(benchmarkDir, unsuccessfulReproductionsDir, notYetReproducedDataDir, reproductionDataDir,
-                    logDir, jarDir, gitHubManager, deleteImages, workflowLogFinder, dependencyRefLinkFinder);
+            return new ResultManager(unsuccessfulReproductionsDir, notYetReproducedDataDir, reproductionDataDir,
+                    failureLogManager, jarDir, gitHubManager, deleteImages, workflowLogFinder, dependencyRefLinkFinder,
+                    reproductionBreakingDir, reproductionFixingDir, reproductionNoChangeDir, reproductionAlwaysFailDir);
         }
     }
 }

@@ -28,11 +28,8 @@ public class ImageMetadataManager {
 
     private final DockerClient client;
 
-    private final Path successfulReproductionLogDir;
-
-    public ImageMetadataManager(DockerClient client, Path successfulReproductionLogDir) {
+    public ImageMetadataManager(DockerClient client) {
         this.client = client;
-        this.successfulReproductionLogDir = successfulReproductionLogDir;
     }
 
     /**
@@ -87,8 +84,8 @@ public class ImageMetadataManager {
             }
             imageMetadata.put(bu.postCommit, reproduction_metadata);
             JsonUtils.writeToFile(imageMetadataFilePath, imageMetadata);
-            log.info("Successfully stored the image metadata for the breaking update {} in {}\\image_metadata.json file.",
-                    bu.postCommit, successfulReproductionLogDir);
+            log.info("Successfully stored the image metadata for the breaking update {} in image_metadata.json file.",
+                    bu.postCommit);
         } catch (RuntimeException | IOException e) {
             log.error("Failed to store the image metadata for the breaking update {}.", bu.postCommit, e);
         }
@@ -122,6 +119,9 @@ public class ImageMetadataManager {
                 reproduction_metadata.put((tagCount < 1) ? "prevImageProjectFolderSize" : "postImageProjectFolderSize",
                         String.valueOf(commandOutput[0]));
 
+                if(tagCount < 1) du.setPrevImageProjectFolderSize(Integer.parseInt(commandOutput[0]));
+                else du.setPostImageProjectFolderSize(Integer.parseInt(commandOutput[0]));
+
             } catch (InterruptedException e) {
                 log.error("Failed to get the folder size of the folder inside the image {} for the " +
                         "breaking update {}.", REPOSITORY + ":" + du.postCommit + tags.get(tagCount), du.postCommit, e);
@@ -141,8 +141,8 @@ public class ImageMetadataManager {
             }
             imageMetadata.put(du.postCommit, reproduction_metadata);
             JsonUtils.writeToFile(imageMetadataFilePath, imageMetadata);
-            log.info("Successfully stored the image metadata for the breaking update {} in {}\\image_metadata.json file.",
-                    du.postCommit, successfulReproductionLogDir);
+            log.info("Successfully stored the image metadata for the breaking update {} in image_metadata.json file.",
+                    du.postCommit);
         } catch (RuntimeException | IOException e) {
             log.error("Failed to store the image metadata for the breaking update {}.", du.postCommit, e);
         }

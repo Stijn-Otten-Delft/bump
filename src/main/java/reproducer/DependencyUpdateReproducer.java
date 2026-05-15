@@ -28,6 +28,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static reproducer.DependencyUpdateType.*;
+
 /**
  * The BreakingUpdateReproducer class attempts to reproduce breaking updates in a container.
  * In case of a successful reproduction, the resulting container is stored.
@@ -40,6 +42,7 @@ public class DependencyUpdateReproducer {
     private static final Short EXIT_CODE_OK = 0;
 
     private final ResultManager resultManager;
+    private final FailureLogManager failureLogManager;
     private final DockerClient client;
 
     private final String cacheVolume;
@@ -50,8 +53,9 @@ public class DependencyUpdateReproducer {
      *
      * @param resultManager the ResultManager that will store information about reproduction results.
      */
-    public DependencyUpdateReproducer(ResultManager resultManager, String cacheVolume, Integer parallel) {
+    public DependencyUpdateReproducer(ResultManager resultManager, FailureLogManager failureLogManager, String cacheVolume, Integer parallel) {
         this.resultManager = resultManager;
+        this.failureLogManager = failureLogManager;
         this.cacheVolume = cacheVolume;
         this.parallel = parallel;
         DockerClientConfig clientConfig = DefaultDockerClientConfig.createDefaultConfigBuilder()
@@ -209,7 +213,13 @@ public class DependencyUpdateReproducer {
             resultManager.saveUnsuccessfulReproductionResult(du);
             //resultManager.storeResult(bu, startedContainers.get("prevCommit"), startedContainers.get("postCommit"),  lastPostContainerId, lastPrevContainerId);
         }else{
-            resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId, previouslyFailed, postFailed);
+            DependencyUpdateType duType;
+            if(previouslyFailed && postFailed) duType = ALWAYS_FAILING;
+            else if(previouslyFailed && !postFailed) duType = FIXING;
+            else if(!previouslyFailed && postFailed) duType = BREAKING;
+            else duType = NO_CHANGE;
+
+            resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId, duType);
         }
 
         // cleanup
@@ -315,16 +325,16 @@ public class DependencyUpdateReproducer {
                     .exec(new WaitContainerResultCallback());
 
             if (result.awaitStatusCode().intValue() != EXIT_CODE_OK) {
-                newFailure = resultManager.getFailure(bu,
+                newFailure = failureLogManager.getFailure(bu,
                         startedContainers.get(containerName.formatted(attemptCount)), true);
                 if (attemptCount == 1) {
-                    prevFailure = resultManager.getFailure(bu,
+                    prevFailure = failureLogManager.getFailure(bu,
                             startedContainers.get(containerName.formatted(attemptCount)), true);
                 }
                 else if (!newFailure.equals(prevFailure)) {
                     log.info("Build has failed due to a different reason in the {} attempt than in the previous attempt."
                             , attemptCount);
-                    if (attemptCount > 1) resultManager.removeLogFile(bu, "successfulReproductionLogs");
+                    if (attemptCount > 1) failureLogManager.removeLogFile(bu, "successfulReproductionLogs");
                     break;
                 } else if (attemptCount > 2) {
                     isBuildSuccessfullyFailed = true;
@@ -332,7 +342,7 @@ public class DependencyUpdateReproducer {
             } else {
                 log.info("Breaking commit did not fail in the {} attempt.", attemptCount);
                 // Remove the log file saved in the successful directory in the previous attempts.
-                if (attemptCount > 1) resultManager.removeLogFile(bu, "successfulReproductionLogs");
+                if (attemptCount > 1) failureLogManager.removeLogFile(bu, "successfulReproductionLogs");
                 break;
             }
         }
