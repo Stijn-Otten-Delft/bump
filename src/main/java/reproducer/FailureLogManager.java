@@ -41,16 +41,17 @@ public class FailureLogManager {
 
     private final DockerClient client;
 
-    private final Path successfulReproductionLogDir;
-    private final Path unsuccessfulReproductionLogDir;
+    private final Path preCommitLogDir;
+    private final Path postCommitLogDir;
 
     public FailureLogManager(Path logDir){
-        successfulReproductionLogDir = logDir.resolve("successfulReproductionLogs");
-        unsuccessfulReproductionLogDir = logDir.resolve("unsuccessfulReproductionLogs");
+        Path successfulReproductionLogDir = logDir.resolve("successfulReproductionLogs");
+        preCommitLogDir = logDir.resolve("preCommitLogs");
+        postCommitLogDir = logDir.resolve("postCommitLogs");
 
         checkIfPathExistOrCreate(successfulReproductionLogDir);
-        checkIfPathExistOrCreate(unsuccessfulReproductionLogDir);
-
+        checkIfPathExistOrCreate(preCommitLogDir);
+        checkIfPathExistOrCreate(postCommitLogDir);
 
         var config = DefaultDockerClientConfig.createDefaultConfigBuilder().build();
 
@@ -75,25 +76,28 @@ public class FailureLogManager {
     /**
      * Get the first failure category in the first reproduction attempt failure.
      */
-    public FailureCategory getFailure(DependencyUpdate bu, String containerId, Boolean isReproducible) {
-        Path logOutputLocation = storeLogFile(bu, containerId, isReproducible);
+    public FailureCategory storeAndGetFailure(DependencyUpdate bu, String containerId, boolean isPreCommit) {
+        Path logOutputLocation = getLogLocation(bu, isPreCommit);
+        storeLogFile(bu, containerId, logOutputLocation);
         return getFailureCategory(logOutputLocation);
+    }
+
+    private Path getLogLocation(DependencyUpdate du, boolean isPreCommit) {
+        Path outputDir = isPreCommit ? preCommitLogDir : postCommitLogDir;
+        return outputDir.resolve(du.postCommit + ".log");
     }
 
     /**
      * Store the log file of the reproduction attempt.
      */
-    private Path storeLogFile(DependencyUpdate bu, String containerId, Boolean isReproducible) {
+    private void storeLogFile(DependencyUpdate du, String containerId, Path logOutputLocation) {
         // Save log result in reproduction dir.
-        Path outputDir = isReproducible ? successfulReproductionLogDir : unsuccessfulReproductionLogDir;
-        Path logOutputLocation = outputDir.resolve(bu.postCommit + ".log");
-        String logLocation = "/%s/%s.log".formatted(bu.project, bu.postCommit);
+        String logLocation = "/%s/%s.log".formatted(du.project, du.postCommit);
         try (InputStream logStream = client.copyArchiveFromContainerCmd(containerId, logLocation).exec()) {
             byte[] fileContent = logStream.readAllBytes();
             Files.write(logOutputLocation, fileContent);
-            return logOutputLocation;
         } catch (IOException e) {
-            log.error("Could not store the log file for breaking update {}", bu.postCommit);
+            log.error("Could not store the log file for breaking update {} at {}", du.postCommit, logOutputLocation);
             throw new RuntimeException(e);
         }
     }
@@ -101,11 +105,16 @@ public class FailureLogManager {
     /**
      * Delete the log file of the reproduction attempt from the wrong directory.
      */
-    public void removeLogFile(DependencyUpdate bu, String directory) {
-        Path outputDir = directory.equals("successful") ? successfulReproductionLogDir : unsuccessfulReproductionLogDir;
-        boolean isRemovingSuccessful = outputDir.resolve(bu.postCommit + ".log").toFile().delete();
-        if (!isRemovingSuccessful) log.error("Could not remove the log file from the {} reproduction directory for the "
-                + "breaking update {}", directory, bu.postCommit);
+    public void removeLogFile(DependencyUpdate du, boolean isPreCommit) {
+        Path logFileLocation = getLogLocation(du, isPreCommit);
+        boolean isRemovingSuccessful = logFileLocation.toFile().delete();
+        if (!isRemovingSuccessful) log.error("Could not remove the log file from {} for the "
+                + "dependency update {}", logFileLocation, du.postCommit);
+    }
+
+    public FailureCategory getFailureCategory(DependencyUpdate du, boolean isPreCommit) {
+        Path logFileLocation = getLogLocation(du, isPreCommit);
+        return getFailureCategory(logFileLocation);
     }
 
     /**

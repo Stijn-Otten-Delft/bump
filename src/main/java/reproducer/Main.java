@@ -170,7 +170,7 @@ public class Main {
 
         // always failing path, if not set they won't be stored and wont be made into images
         @CommandLine.Option(
-                names = {"-rdf", "--reproduction-always-fail-dir"},
+                names = {"-rdaf", "--reproduction-always-fail-dir"},
                 paramLabel = "REPRODUCTION-ALWAYS-FAIL-DIR",
                 description = "The directory where the always failing dependency update files are stored, if this is not set they won't be stored (nor their images)"
         )

@@ -292,7 +292,7 @@ public class DependencyUpdateReproducer {
         return attemptCount;
     }
 
-    private int reproducibleFailure(DependencyUpdate bu, Map<String, String> startedContainers, boolean isPre) {
+    private int reproducibleFailure(DependencyUpdate du, Map<String, String> startedContainers, boolean isPre) {
         //if we every want both pre- and post-fail information the logging here needs to change to tag the logs with the pre- and post-tag
 
         int attemptCount;
@@ -300,32 +300,32 @@ public class DependencyUpdateReproducer {
         ReproducibleDependencyUpdate.FailureCategory prevFailure = null;
         ReproducibleDependencyUpdate.FailureCategory newFailure;
 
-        String containerCommand = isPre ? getPrevCmd(bu) : getPostCmd(bu);
+        String containerCommand = isPre ? getPrevCmd(du) : getPostCmd(du);
         String containerName = isPre ? "prevContainer%s" : "postContainer%s";
 
         String preOrPost = isPre ? "previous" : "post";
 
         // Try running tests 3 times to ensure that the breakage is reproducible.
         for (attemptCount = 1; attemptCount < 4; attemptCount++) {
-            log.info("Attempting for the {} time to compile and test failure of {} update {}", attemptCount, preOrPost, bu.postCommit);
+            log.info("Attempting for the {} time to compile and test failure of {} update {}", attemptCount, preOrPost, du.postCommit);
 
-            String containerId = startContainer(bu, containerCommand);
+            String containerId = startContainer(du, containerCommand);
             startedContainers.put(containerName.formatted(attemptCount), containerId);
 
             WaitContainerResultCallback result = client.waitContainerCmd(containerId)
                     .exec(new WaitContainerResultCallback());
 
             if (result.awaitStatusCode().intValue() != EXIT_CODE_OK) {
-                newFailure = failureLogManager.getFailure(bu,
-                        startedContainers.get(containerName.formatted(attemptCount)), true);
+                newFailure = failureLogManager.storeAndGetFailure(du,
+                        startedContainers.get(containerName.formatted(attemptCount)), isPre);
                 if (attemptCount == 1) {
-                    prevFailure = failureLogManager.getFailure(bu,
-                            startedContainers.get(containerName.formatted(attemptCount)), true);
+                    prevFailure = failureLogManager.storeAndGetFailure(du,
+                            startedContainers.get(containerName.formatted(attemptCount)), isPre);
                 }
                 else if (!newFailure.equals(prevFailure)) {
                     log.info("Build has failed due to a different reason in the {} attempt than in the previous attempt."
                             , attemptCount);
-                    if (attemptCount > 1) failureLogManager.removeLogFile(bu, "successfulReproductionLogs");
+                    if (attemptCount > 1) failureLogManager.removeLogFile(du, isPre);
                     break;
                 } else if (attemptCount > 2) {
                     isBuildSuccessfullyFailed = true;
@@ -333,7 +333,7 @@ public class DependencyUpdateReproducer {
             } else {
                 log.info("Breaking commit did not fail in the {} attempt.", attemptCount);
                 // Remove the log file saved in the successful directory in the previous attempts.
-                if (attemptCount > 1) failureLogManager.removeLogFile(bu, "successfulReproductionLogs");
+                if (attemptCount > 1) failureLogManager.removeLogFile(du, isPre);
                 break;
             }
         }

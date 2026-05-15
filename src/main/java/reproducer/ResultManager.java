@@ -169,13 +169,14 @@ public class ResultManager {
 
         //todo make pre and post fail at the same time work
         //set the failure category if it exists
-        if(preFail || postFail) {
-            Path logOutputLocation = successfulReproductionLogDir.resolve(du.postCommit + ".log");
-            // Get failure category.
-            FailureCategory failureCategory = getFailureCategory(logOutputLocation);
+        if(duType == ALWAYS_FAILING || duType == FIXING) {
+            FailureCategory failureCategory = failureLogManager.getFailureCategory(du, true);
+            reproducibleDU.setPreFailureCategory(failureCategory);
+        }
 
-            if(preFail) reproducibleDU.setPreFailureCategory(failureCategory);
-            else reproducibleDU.setPostFailureCategory(failureCategory);
+        if(duType == ALWAYS_FAILING || duType == BREAKING) {
+            FailureCategory failureCategory = failureLogManager.getFailureCategory(du, false);
+            reproducibleDU.setPostFailureCategory(failureCategory);
         }
 
         String preImageTag = PRECEDING_COMMIT_CONTAINER_TAG + (duType == ALWAYS_FAILING || duType == FIXING ? BREAKING_UPDATE_COMMIT_CONTAINER_TAG : "");
