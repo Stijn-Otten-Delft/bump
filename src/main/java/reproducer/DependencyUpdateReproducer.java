@@ -48,6 +48,11 @@ public class DependencyUpdateReproducer {
     private final String cacheVolume;
     private final Integer parallel;
 
+    private static final String PrevFailContainerName = "prevFailContainer%s";
+    private static final String PrevSucContainerName = "prevSucContainer%s";
+    private static final String PostFailContainerName = "postFailContainer%s";
+    private static final String PostSucContainerName = "postSucContainer%s";
+
     /**
      * Set up a new BreakingUpdateReproducer creating new Docker images based on {@value miner.common.DockerConstants#BASE_IMAGE}
      *
@@ -193,8 +198,16 @@ public class DependencyUpdateReproducer {
         boolean postFailed = postAttemptCount < 0;
         if (postFailed) postAttemptCount = -postAttemptCount;
 
-        String lastPostContainerId = startedContainers.get("postContainer%s".formatted(postAttemptCount - 1));
-        String lastPrevContainerId = startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1));
+        String lastPostContainerId = (postFailed) ?
+                startedContainers.get(PostFailContainerName.formatted(postAttemptCount - 1)) :
+                startedContainers.get(PostSucContainerName.formatted(postAttemptCount - 1));
+
+        String lastPrevContainerId = (previouslyFailed) ?
+                startedContainers.get(PrevFailContainerName.formatted(prevAttemptCount - 1)) :
+                startedContainers.get(PrevSucContainerName.formatted(prevAttemptCount - 1));
+
+        //String lastPostContainerId = startedContainers.get("postContainer%s".formatted(postAttemptCount - 1));
+        //String lastPrevContainerId = startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1));
 
 
         DependencyUpdateType duType;
@@ -239,7 +252,7 @@ public class DependencyUpdateReproducer {
 
         // make a lambda that represents getPrevCMd or getPostCmd based on the preOrPost parameter
         String containerCommand = isPre ? getPrevCmd(bu) : getPostCmd(bu);
-        String containerName = isPre ? "prevContainer%s" : "postContainer%s";
+        String containerName = isPre ? PrevSucContainerName : PostSucContainerName;
 
         String preOrPost = isPre ? "previous" : "post";
 
@@ -293,7 +306,7 @@ public class DependencyUpdateReproducer {
         ReproducibleDependencyUpdate.FailureCategory newFailure;
 
         String containerCommand = isPre ? getPrevCmd(du) : getPostCmd(du);
-        String containerName = isPre ? "prevContainer%s" : "postContainer%s";
+        String containerName = isPre ? PrevFailContainerName : PostFailContainerName;
 
         String preOrPost = isPre ? "previous" : "post";
 
