@@ -205,22 +205,13 @@ public class DependencyUpdateReproducer {
         String lastPrevContainerId = startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1));
 
 
-        if (previouslyFailed && postFailed) {
-            // this is a dependency update that was broken before and after
-            // todo change the way we store this
-            // todo maybe don't save this, this is just a broken project.
-            // todo save this someweher tho to debug this tool, as for example the previous time the problem was the java version
-            resultManager.saveUnsuccessfulReproductionResult(du);
-            //resultManager.storeResult(bu, startedContainers.get("prevCommit"), startedContainers.get("postCommit"),  lastPostContainerId, lastPrevContainerId);
-        }else{
-            DependencyUpdateType duType;
-            if(previouslyFailed && postFailed) duType = ALWAYS_FAILING;
-            else if(previouslyFailed && !postFailed) duType = FIXING;
-            else if(!previouslyFailed && postFailed) duType = BREAKING;
-            else duType = NO_CHANGE;
+        DependencyUpdateType duType;
+        if(previouslyFailed && postFailed) duType = ALWAYS_FAILING;
+        else if(previouslyFailed && !postFailed) duType = FIXING;
+        else if(!previouslyFailed && postFailed) duType = BREAKING;
+        else duType = NO_CHANGE;
 
-            resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId, duType);
-        }
+        resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId, duType);
 
         // cleanup
         removeContainers(du, startedContainers.values());
