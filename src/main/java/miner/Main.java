@@ -1,6 +1,8 @@
 package miner;
 
 import miner.common.PathConstants;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 
 import java.io.IOException;
@@ -17,15 +19,56 @@ import java.util.List;
  */
 public class Main {
 
+    private static final Logger log = LoggerFactory.getLogger(Main.class);
+
     public static void main(String[] args) {
         int exitCode = new CommandLine(new CLIEntryPoint()).execute(args);
         System.exit(exitCode);
     }
 
-    @CommandLine.Command(subcommands = {Mine.class, Find.class},mixinStandardHelpOptions = true,version = "0.1")
+    @CommandLine.Command(subcommands = {Mine.class, Find.class, FindToMine.class},mixinStandardHelpOptions = true,version = "0.1")
     public static class CLIEntryPoint implements Runnable {
         @Override
         public void run() { CommandLine.usage(this, System.out); }
+    }
+
+    private static void runFind(Path apiTokenFile, Path outputDirectory, Path searchConfigFile, Path repoFile, Date lastDate, Integer maxRepos) throws IOException {
+        if(repoFile == null && outputDirectory == null) {
+            throw new IllegalArgumentException("Either '-o' or '-r' must be specified");
+        }
+
+        if (repoFile == null) {
+            Path filePath = outputDirectory.resolve(PathConstants.FOUND_REPOS_FILE);
+            try {
+                repoFile = Files.writeString(filePath, JsonUtils.EMPTY_JSON_OBJECT, StandardOpenOption.CREATE_NEW);
+            } catch (IOException e) {
+                System.err.println("Could not create a output file in " + filePath +
+                        " as the file might already exist. Either specify a different output path or provide" +
+                        " an explicit output file for found repositories.");
+                System.exit(1);
+            }
+            System.out.println("Created a new file for found repos as " + filePath);
+        }
+
+        List<String> apiTokens = Files.readAllLines(apiTokenFile);
+        GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
+
+        RepositorySearchConfig searchConfig = RepositorySearchConfig.fromJson(searchConfigFile);
+        var repoList = new RepositoryList(repoFile);
+        if (maxRepos == null) maxRepos = Integer.MAX_VALUE;
+
+        GitHubFinder gitHubFinder = new GitHubFinder(tokenQueue);
+        gitHubFinder.findRepositories(repoList, searchConfig, lastDate, maxRepos);
+    }
+
+    private static void runMine(Path apiTokenFile, Path outputDirectory, Path repoFile) throws IOException {
+        List<String> apiTokens = Files.readAllLines(apiTokenFile);
+        GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
+
+        RepositoryList repoList = new RepositoryList(repoFile);
+        GitHubMiner gitHubMiner = new GitHubMiner(tokenQueue, outputDirectory);
+
+        gitHubMiner.mineRepositories(repoList);
     }
 
     @CommandLine.Command(name = "mine", mixinStandardHelpOptions = true, version = "0.1")
@@ -57,13 +100,7 @@ public class Main {
         @Override
         public void run() {
             try {
-                List<String> apiTokens = Files.readAllLines(apiTokenFile);
-                GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
-
-                RepositoryList repoList = new RepositoryList(repoFile);
-                GitHubMiner gitHubMiner = new GitHubMiner(tokenQueue, outputDirectory);
-
-                gitHubMiner.mineRepositories(repoList);
+                runMine(apiTokenFile, outputDirectory, repoFile);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -117,33 +154,73 @@ public class Main {
 
         @Override
         public void run() {
-            if(repoFile == null && outputDirectory == null) {
-                throw new IllegalArgumentException("Either '-o' or '-r' must be specified");
-            }
-
-            if (repoFile == null) {
-                Path filePath = outputDirectory.resolve(PathConstants.FOUND_REPOS_FILE);
-                try {
-                    repoFile = Files.writeString(filePath, JsonUtils.EMPTY_JSON_OBJECT, StandardOpenOption.CREATE_NEW);
-                } catch (IOException e) {
-                    System.err.println("Could not create a output file in " + filePath +
-                            " as the file might already exist. Either specify a different output path or provide" +
-                            " an explicit output file for found repositories.");
-                    System.exit(1);
-                }
-                System.out.println("Created a new file for found repos as " + filePath);
-            }
             try {
-                List<String> apiTokens = Files.readAllLines(apiTokenFile);
-                GitHubAPITokenQueue tokenQueue = new GitHubAPITokenQueue(apiTokens);
-
-                RepositorySearchConfig searchConfig = RepositorySearchConfig.fromJson(searchConfigFile);
-                var repoList = new RepositoryList(repoFile);
-                if (maxRepos == null) maxRepos = Integer.MAX_VALUE;
-
-                GitHubFinder gitHubFinder = new GitHubFinder(tokenQueue);
-                gitHubFinder.findRepositories(repoList, searchConfig, lastDate, maxRepos);
+                runFind(apiTokenFile, outputDirectory, searchConfigFile, repoFile, lastDate, maxRepos);
             } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    @CommandLine.Command(name = "find-to-mine", mixinStandardHelpOptions = true, version = "0.1")
+    private static class FindToMine implements Runnable {
+        @CommandLine.Option(
+                names = {"-a", "--api-tokens"},
+                paramLabel = "TOKEN-FILE",
+                description = "A file containing a newline separated list of GitHub API tokens",
+                required = true
+        )
+        Path apiTokenFile;
+
+        @CommandLine.Option(
+                names = {"-o", "--output-directory"},
+                paramLabel = "OUTPUT-DIR",
+                description = "A directory where output data will be stored.",
+                required = true
+        )
+        Path outputDirectory;
+        @CommandLine.Option(
+                names = {"-s", "--search-config"},
+                paramLabel = "SEARCH-CONFIG",
+                description = "A JSON file specifying details about the repositories to search for, " +
+                        "it is required if there is no existing repository file provided."
+        )
+        Path searchConfigFile;
+
+        @CommandLine.Option(
+                names = {"-r", "--repos"},
+                paramLabel = "REPO-FILE",
+                description = "A JSON file containing previously found repositories. If used, this file will be updated," +
+                        "otherwise a new file called found_repositories.json will be created in the output directory."
+        )
+        Path repoFile;
+        @CommandLine.Option(
+                names = {"-l", "--last"},
+                paramLabel = "LAST-DATE",
+                description = "Last date of search"
+        )
+        Date lastDate;
+        @CommandLine.Option(
+                names = {"-m", "--max-repos", "--max"},
+                paramLabel = "MAX-REPOS",
+                description = "Maximum number of repositories to find"
+        )
+        Integer maxRepos;
+
+        @Override
+        public void run() {
+            try {
+                runFind(apiTokenFile, outputDirectory, searchConfigFile, repoFile, lastDate, maxRepos);
+
+            } catch (Exception e) {
+                log.error("Error while running find part of find-to-mine", e);
+                log.info("Will still continue to run the mine part");
+            }
+
+            try{
+                runMine(apiTokenFile, outputDirectory, repoFile);
+            } catch (Exception e) {
+                log.error("Error while running mine part of find-to-mine", e);
                 throw new RuntimeException(e);
             }
         }
