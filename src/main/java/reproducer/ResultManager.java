@@ -144,7 +144,8 @@ public class ResultManager {
                 GHRepository repository = dependencyRefLinkFinder.getGithubRepository(du);
                 githubCompareLink = dependencyRefLinkFinder.getGithubCompareLink(repository, du);
                 githubSlug = repository.getName();
-                dependencyLicenseInfo = repository.getLicense().getName();
+                var license = repository.getLicense();
+                if(license != null)dependencyLicenseInfo = license.getName();
             } catch (IOException e) {
                 log.error("Could not get dependency GH repository for commit {} and dependency {}", du.postCommit,
                         du.updatedDependency.dependencyGroupID + du.updatedDependency.dependencyArtifactID);
