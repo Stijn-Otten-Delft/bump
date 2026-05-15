@@ -180,9 +180,8 @@ public class ResultManager {
         //from here on out it might need the change depending on what type of dependency update it is
 
         // Create a new reproducible breaking update object.
-        ReproducibleDependencyUpdate reproducibleDU = new ReproducibleDependencyUpdate(du.url, du.project, du.projectOrganisation,
-                du.postCommit, du.prAuthor, du.preCommitAuthor, du.postCommitAuthor, du.updatedDependency,
-                githubCompareLink, mavenSourceLinkPre, mavenSourceLinkBreaking, updateType, du.licenseInfo, dependencyLicenseInfo, githubSlug);;
+        ReproducibleDependencyUpdate reproducibleDU = new ReproducibleDependencyUpdate(du,
+                githubCompareLink, mavenSourceLinkPre, mavenSourceLinkBreaking, updateType, dependencyLicenseInfo, githubSlug);;
 
 
         // Delete the BreakingUpdateJSON data from the in-progress-reproductions directory.

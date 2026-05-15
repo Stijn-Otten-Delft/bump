@@ -10,7 +10,10 @@ public class ReproducibleDependencyUpdate extends DependencyUpdate {
     public final UpdatedDependency updatedDependency;
     private FailureCategory preFailureCategory;
     private FailureCategory postFailureCategory;
-    public String licenseInfo;
+
+    private int prevImageProjectFolderSize;
+    private int postImageProjectFolderSize;
+
 
     /**
      * Create a new ReproducibleDependencyUpdate object that stores information about a
@@ -25,6 +28,14 @@ public class ReproducibleDependencyUpdate extends DependencyUpdate {
         this.updatedDependency = new UpdatedDependency(updatedDependency.dependencyGroupID, updatedDependency.dependencyArtifactID,
                 updatedDependency.previousVersion, updatedDependency.newVersion, updatedDependency.dependencyScope,
                 updatedDependency.versionUpdateType, updatedDependency.dependencySection, githubCompareLink, mavenSourceLinkPre,
+                mavenSourceLinkPost, updatedFileType, dependencyLicenseInfo, githubRepoSlug);
+    }
+
+    public ReproducibleDependencyUpdate(DependencyUpdate du, String githubCompareLink, String mavenSourceLinkPre,
+                                        String mavenSourceLinkPost, UpdatedDependency.UpdatedFileType updatedFileType,
+                                        String dependencyLicenseInfo, String githubRepoSlug){
+        super(du.url, du.project, du.projectOrganisation, du.postCommit, du.prAuthor, du.preCommitAuthor, du.postCommitAuthor, du.updatedDependency, du.licenseInfo);
+        this.updatedDependency = new UpdatedDependency(du.updatedDependency, githubCompareLink, mavenSourceLinkPre,
                 mavenSourceLinkPost, updatedFileType, dependencyLicenseInfo, githubRepoSlug);
     }
 
@@ -106,6 +117,14 @@ public class ReproducibleDependencyUpdate extends DependencyUpdate {
         return postUpdateReproductionCommand;
     }
 
+    public void setPrevImageProjectFolderSize(int prevImageProjectFolderSize) {
+        this.prevImageProjectFolderSize = prevImageProjectFolderSize;
+    }
+
+    public void setPostImageProjectFolderSize(int postImageProjectFolderSize) {
+        this.postImageProjectFolderSize = postImageProjectFolderSize;
+    }
+
     /**
      * Failure category indicating the status of the reproduction, i.e. the results of attempted reproduction.
      */
@@ -160,6 +179,18 @@ public class ReproducibleDependencyUpdate extends DependencyUpdate {
                                  UpdatedFileType updatedFileType, String licenseInfo, String githubRepoSlug) {
             super(dependencyGroupID, dependencyArtifactID, previousVersion, newVersion, dependencyScope, versionUpdateType,
                     dependencySection);
+            this.githubCompareLink = githubCompareLink;
+            this.mavenSourceLinkPre = mavenSourceLinkPre;
+            this.mavenSourceLinkPost = mavenSourceLinkPost;
+            this.updatedFileType = updatedFileType;
+            this.licenseInfo = licenseInfo;
+            this.githubRepoSlug = githubRepoSlug;
+        }
+
+        public UpdatedDependency(DependencyUpdate.UpdatedDependency ud, String githubCompareLink, String mavenSourceLinkPre,
+                                 String mavenSourceLinkPost, UpdatedFileType updatedFileType, String licenseInfo, String githubRepoSlug){
+            super(ud.dependencyGroupID, ud.dependencyArtifactID, ud.previousVersion, ud.newVersion, ud.dependencyScope, ud.versionUpdateType, ud.dependencySection);
+
             this.githubCompareLink = githubCompareLink;
             this.mavenSourceLinkPre = mavenSourceLinkPre;
             this.mavenSourceLinkPost = mavenSourceLinkPost;
