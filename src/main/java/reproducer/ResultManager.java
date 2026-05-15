@@ -1,6 +1,7 @@
 package reproducer;
 
 import com.github.dockerjava.api.DockerClient;
+import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.exception.NotFoundException;
 import com.github.dockerjava.core.DefaultDockerClientConfig;
 import com.github.dockerjava.core.DockerClientImpl;
@@ -15,12 +16,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import static miner.common.DockerConstants.*;
 import static reproducer.DependencyUpdateType.*;
@@ -116,8 +114,8 @@ public class ResultManager {
     /**
      * Store results when the reproduction finds a breaking update
      */
-    public void storeDependencyUpdateResult(DependencyUpdate du, String postContainerId, String prevContainerId, String lastPostContainerId, String lastPrevContainerId, DependencyUpdateType duType) {
-        if(duType == ALWAYS_FAILING && reproductionAlwaysFailDir == null) { //todo fix
+    public void storeDependencyUpdateResult(DependencyUpdate du, String postContainerId, String prevContainerId, DependencyUpdateType duType) {
+        if(duType == ALWAYS_FAILING && reproductionAlwaysFailDir == null) {
             log.warn("We are not storing the result for the dependency update {} that fails both before and after the update since no reproduction-always-fail-dir was provided.",
                     du.postCommit);
 
@@ -148,7 +146,8 @@ public class ResultManager {
                 githubSlug = repository.getName();
                 dependencyLicenseInfo = repository.getLicense().getName();
             } catch (IOException e) {
-                log.error("Could not get GH repository for {}", du.postCommit); //todo make this log more obvious what github we were trying to find
+                log.error("Could not get dependency GH repository for commit {} and dependency {}", du.postCommit,
+                        du.updatedDependency.dependencyGroupID + du.updatedDependency.dependencyArtifactID);
             }
 
             List<String> mavenSourceLinks = dependencyRefLinkFinder.getMavenSourceLinks(du);
@@ -158,16 +157,15 @@ public class ResultManager {
             }
         }
 
-        UpdatedFileType updateType = extractDependencies(du, lastPostContainerId, lastPrevContainerId);
+        UpdatedFileType updateType = extractDependencies(du, postContainerId, prevContainerId);
 
         //from here on out it might need the change depending on what type of dependency update it is
 
         // Create a new reproducible breaking update object.
         ReproducibleDependencyUpdate reproducibleDU = new ReproducibleDependencyUpdate(du,
-                githubCompareLink, mavenSourceLinkPre, mavenSourceLinkBreaking, updateType, dependencyLicenseInfo, githubSlug);;
+                githubCompareLink, mavenSourceLinkPre, mavenSourceLinkBreaking, updateType, dependencyLicenseInfo, githubSlug);
 
 
-        //todo make pre and post fail at the same time work
         //set the failure category if it exists
         if(duType == ALWAYS_FAILING || duType == FIXING) {
             FailureCategory failureCategory = failureLogManager.getFailureCategory(du, true);
@@ -324,17 +322,6 @@ public class ResultManager {
         if (!isRemovingSuccessful) log.error("Could not remove the JSON file from the in-progress-reproductions directory.");
     }
 
-    public void moveDependencyUpdateFile(DependencyUpdate bu, boolean x) {
-        log.info("Moving the JSON file from the in-progress-reproductions directory.");
-        Path sourcePath = notYetReproducedDataDir.resolve(bu.postCommit + JsonUtils.JSON_FILE_ENDING);
-        Path targetPath = alreadyReproducedDataDir.resolve(bu.postCommit + JsonUtils.JSON_FILE_ENDING);
-        try {
-            Files.move(sourcePath, targetPath);
-        } catch (IOException e) {
-            log.error("Could not move the JSON file to the already-reproduced directory for breaking update {}", bu.postCommit);
-        }
-    }
-
     public void moveDependencyUpdateFile(DependencyUpdate bu, String subDir) {
         log.info("Moving the JSON file from the in-progress-reproductions directory.");
         Path sourcePath = notYetReproducedDataDir.resolve(subDir).resolve(bu.postCommit + JsonUtils.JSON_FILE_ENDING);
@@ -350,21 +337,6 @@ public class ResultManager {
      * Save breaking update JSON data in unsuccessful-reproductions dir when the reproduction is unsuccessful.
      */
     public void saveUnsuccessfulReproductionResult(DependencyUpdate bu) {
-        var unreproducibleDU = new UnreproducibleDependencyUpdate(bu);
-
-        // Delete the BreakingUpdateJSON data from the in-progress-reproductions directory.
-        removeDependencyUpdateFile(bu);
-        log.info("Saving the JSON file containing an unreproducible breaking update {} in unsuccessful-reproductions " +
-                "dir.", unreproducibleDU.postCommit);
-        // Update breaking update file.
-        JsonUtils.writeToFile(unsuccessfulReproductionDir.resolve(unreproducibleDU.postCommit +
-                JsonUtils.JSON_FILE_ENDING), unreproducibleDU);
-    }
-
-    /**
-     * Save breaking update JSON data in unsuccessful-reproductions dir when the reproduction is unsuccessful.
-     */
-    public void savePreAndPostFailureReproductionResult(DependencyUpdate bu) {
         var unreproducibleDU = new UnreproducibleDependencyUpdate(bu);
 
         // Delete the BreakingUpdateJSON data from the in-progress-reproductions directory.
@@ -456,51 +428,69 @@ public class ResultManager {
         return null;
     }
 
-    /**
-     * Create a new image with the changes of a breaking update reproduction container.
-     */
-    private void createImage(ReproducibleDependencyUpdate bu, String containerId, String extraTag) {
-        Map<String, String> labels = Map.of(
-                "github_repository", bu.project,
-                "pr_url", bu.url,
-                "updated_dependency", bu.updatedDependency.dependencyGroupID + "/" +
-                        bu.updatedDependency.dependencyArtifactID,
-                "new_version", bu.updatedDependency.newVersion,
-                "previous_version", bu.updatedDependency.previousVersion,
-                "failure_category", bu.getPostFailureCategory().name() //todo AAAAAAH
-        );
-        client.commitCmd(containerId).withRepository(REPOSITORY).withTag(bu.postCommit + extraTag)
-                .withLabels(labels).exec();
-    }
+//    /**
+//     * Create a new image with the changes of a breaking update reproduction container.
+//     */
+//    private void createImage(ReproducibleDependencyUpdate bu, String containerId, String extraTag) {
+//        Map<String, String> labels = Map.of(
+//                "github_repository", bu.project,
+//                "pr_url", bu.url,
+//                "updated_dependency", bu.updatedDependency.dependencyGroupID + "/" +
+//                        bu.updatedDependency.dependencyArtifactID,
+//                "new_version", bu.updatedDependency.newVersion,
+//                "previous_version", bu.updatedDependency.previousVersion,
+//                "failure_category", bu.getPostFailureCategory().name()
+//        );
+//        client.commitCmd(containerId).withRepository(REPOSITORY).withTag(bu.postCommit + extraTag)
+//                .withLabels(labels).exec();
+//    }
 
     /**
-     * Create a new image with the changes of a breaking update reproduction container.
+     * Create a new image with the changes of a dependency update reproduction container.
      */
-    private void createImage(ReproducibleDependencyUpdate bu, String containerId, String extraTag, FailureCategory failureCategory) {
+    private void createImage(ReproducibleDependencyUpdate du, String containerId, String extraTag, FailureCategory failureCategory) {
         HashMap<String, String> labels = new HashMap<>(Map.of(
-                "github_repository", bu.project,
-                "pr_url", bu.url,
-                "updated_dependency", bu.updatedDependency.dependencyGroupID + "/" +
-                        bu.updatedDependency.dependencyArtifactID,
-                "new_version", bu.updatedDependency.newVersion,
-                "previous_version", bu.updatedDependency.previousVersion
+                "github_repository", du.project,
+                "pr_url", du.url,
+                "updated_dependency", du.updatedDependency.dependencyGroupID + "/" +
+                        du.updatedDependency.dependencyArtifactID,
+                "new_version", du.updatedDependency.newVersion,
+                "previous_version", du.updatedDependency.previousVersion
         ));
 
         if(failureCategory != null) {
             labels.put("failure_category", failureCategory.name());
         }
 
-        client.commitCmd(containerId).withRepository(REPOSITORY).withTag(bu.postCommit + extraTag)
+        //create an image and container that cd's into the repo dir and executes mvn test
+        client.commitCmd(containerId).withRepository(du.postCommit).withTag("temp").exec();
+        CreateContainerResponse container = client.createContainerCmd(du.postCommit + ":temp")
+                .withWorkingDir("/" + du.project)
+                .withCmd("sh", "-c", getCmd())
+                .exec();
+        String newContainerId = container.getId();
+
+        // the actual image that we want to create
+        client.commitCmd(newContainerId).withRepository(REPOSITORY).withTag(du.postCommit + extraTag)
                 .withLabels(labels).exec();
+
+        // now delete the temp container and image
+        client.removeContainerCmd(newContainerId).exec();
+        client.removeImageCmd(du.postCommit + ":temp").exec();
     }
 
-    /**
-     * Delete the local images after pushing to the GitHub packages
-     */
-    private void deleteImages(String buCommit) {
-        client.removeImageCmd(REPOSITORY + ":" + buCommit + PRECEDING_COMMIT_CONTAINER_TAG).withForce(true).exec();
-        client.removeImageCmd(REPOSITORY + ":" + buCommit + BREAKING_UPDATE_COMMIT_CONTAINER_TAG).withForce(true).exec();
+    /** Command to compile and test the breaking update to be used in the final debloated image */
+    private static String getCmd() {
+        return "mvn clean test -B";
     }
+
+//    /**
+//     * Delete the local images after pushing to the GitHub packages
+//     */
+//    private void deleteImages(String buCommit) {
+//        client.removeImageCmd(REPOSITORY + ":" + buCommit + PRECEDING_COMMIT_CONTAINER_TAG).withForce(true).exec();
+//        client.removeImageCmd(REPOSITORY + ":" + buCommit + BREAKING_UPDATE_COMMIT_CONTAINER_TAG).withForce(true).exec();
+//    }
 
     private void deleImage(String buCommit, String imageTag){
         client.removeImageCmd(REPOSITORY + ":" + buCommit + imageTag).withForce(true).exec();

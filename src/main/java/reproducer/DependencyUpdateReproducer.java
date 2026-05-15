@@ -193,14 +193,6 @@ public class DependencyUpdateReproducer {
         boolean postFailed = postAttemptCount < 0;
         if (postFailed) postAttemptCount = -postAttemptCount;
 
-        // we have a reproducible something, create their images
-        startedContainers.put("postCommit",
-                createImageForCommit(du, startedContainers.get("postContainer%s".formatted(postAttemptCount - 1)),
-                        "post"));
-        startedContainers.put("prevCommit",
-                createImageForCommit(du, startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1)),
-                        "pre"));
-
         String lastPostContainerId = startedContainers.get("postContainer%s".formatted(postAttemptCount - 1));
         String lastPrevContainerId = startedContainers.get("prevContainer%s".formatted(prevAttemptCount - 1));
 
@@ -211,11 +203,11 @@ public class DependencyUpdateReproducer {
         else if(!previouslyFailed && postFailed) duType = BREAKING;
         else duType = NO_CHANGE;
 
-        resultManager.storeDependencyUpdateResult(du, startedContainers.get("postCommit"), startedContainers.get("prevCommit"), lastPostContainerId, lastPrevContainerId, duType);
+        resultManager.storeDependencyUpdateResult(du, lastPostContainerId, lastPrevContainerId, duType);
 
         // cleanup
         removeContainers(du, startedContainers.values());
-        removeImages(du, List.of("base", "pre", "post"));
+        removeImages(du, List.of("base"));
     }
 
     private void failReproduce(DependencyUpdate du, Map<String, String> startedContainers) {
@@ -393,11 +385,6 @@ public class DependencyUpdateReproducer {
                 .formatted(bu.postCommit, bu.postCommit);
     }
 
-    /** Command to compile and test the breaking update to be used in the final debloated image */
-    private static String getCmd() {
-        return "mvn clean test -B";
-    }
-
     /** Ensure that the maven docker image we use as a base exists */
     public void ensureBaseMavenImageExists() throws InterruptedException {
         try {
@@ -432,16 +419,5 @@ public class DependencyUpdateReproducer {
         log.info("Created docker image for breaking update {}", bu.postCommit);
 
         client.removeContainerCmd(container.getId()).exec();
-    }
-
-    /** Create new docker images for the previous and post commits of the given breaking update **/
-    private String createImageForCommit(DependencyUpdate bu, String containerId, String extraTag) {
-        //todo maybe check if we used the volume and if so change that here, or maybe not I'm not 100% sure that that would be required"
-        client.commitCmd(containerId).withRepository(bu.postCommit).withTag(extraTag).exec();
-        CreateContainerResponse container = client.createContainerCmd(bu.postCommit + ":" + extraTag)
-                .withWorkingDir("/" + bu.project)
-                .withCmd("sh", "-c", getCmd())
-                .exec();
-        return container.getId();
     }
 }
