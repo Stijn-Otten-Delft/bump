@@ -97,18 +97,37 @@ public class GitPatchCache {
     }
 
     private static String getPullRequestDiffContents(GHPullRequest pr) throws IOException {
+        return getPullRequestDiffContents(pr, false);
+    }
+
+    private static String getPullRequestDiffContents(GHPullRequest pr, boolean rateLimit) throws IOException {
         if (httpClient == null || accessToken == null)
             throw new IllegalStateException("GitPatchCache has not been initialized");
 
         Call request = httpClient.newCall(new Request.Builder()
                 .get()
-                .url(pr.getDiffUrl())
+                .url(pr.getUrl())
                 .header("Authorization", "bearer " + accessToken)
+                .header("Accept", "application/vnd.github.v3.diff")
                 .build());
 
         try (var response = request.execute()) {
+            if (response.code() == 429){
+                if (rateLimit){
+                    throw new IOException("Hit rate limit when trying to get diff for PR {} for the second time");
+                }
+
+                log.warn("Hit rate limit when trying to get diff for PR {}, retrying after 60 seconds", pr.getHtmlUrl());
+                try {
+                    Thread.sleep(60000);
+                } catch (InterruptedException e) {
+                    log.error("Sleep interrupted: ", e);
+                }
+                return getPullRequestDiffContents(pr, true);
+            }
+
             if (response.code() != HttpURLConnection.HTTP_OK)
-                throw new IOException("Failed to get diff for PR " + pr.getHtmlUrl());
+                throw new IOException("Failed to get diff for PR " + pr.getHtmlUrl() + ". Status code: " + response.code());
             return Objects.requireNonNull(response.body()).string();
         }
     }

@@ -75,7 +75,11 @@ public class GitHubFinder {
                         break;
                     }
                     repoList.add(repository);
-                    log.info("  Found {}", repository.getUrl());
+                    if (maxRepos == Integer.MAX_VALUE) {
+                        log.info("  Found {}", repository.getUrl());
+                    } else {
+                        log.info("  Found {} ({}/{})", repository.getUrl(), repoList.size() - previousSize, maxRepos);
+                    }
                 }
             }
             creationDate = creationDate.minusDays(1);
