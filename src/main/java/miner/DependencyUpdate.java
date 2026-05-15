@@ -277,6 +277,11 @@ public class DependencyUpdate {
             String url = pr.getHtmlUrl().toString();
             String pomXmlContent = GitPatchCache.get(url.split("/")[3], url.split("/")[4],
                     pr.getHead().getSha(), filePath).orElse("");
+
+            if (pomXmlContent == ""){
+                log.warn("Could not retrieve pom.xml content for PR {}, url: {}, filePath: {}", pr.getNumber(), url, filePath);
+                return "unknown";
+            }
             try {
                 MavenXpp3Reader reader = new MavenXpp3Reader();
                 Model model = reader.read(new StringReader(pomXmlContent));
