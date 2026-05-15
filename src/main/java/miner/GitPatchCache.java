@@ -127,7 +127,9 @@ public class GitPatchCache {
             }
 
             if (response.code() != HttpURLConnection.HTTP_OK)
-                throw new IOException("Failed to get diff for PR " + pr.getHtmlUrl() + ". Status code: " + response.code());
+                throw new IOException("Failed to get diff for PR " + pr.getHtmlUrl() + ". Status code: " + response.code()
+                        + "\n request url" + response.request().url()
+                        + "\n Response body: " + (response.body() != null ? response.body().string() : "null"));
             return Objects.requireNonNull(response.body()).string();
         }
     }
@@ -140,6 +142,7 @@ public class GitPatchCache {
         Call request = httpClient.newCall(new Request.Builder()
                 .url(apiUrl)
                 .header("Accept", "application/vnd.github.v3+json")
+                .header("Authorization", "bearer " + accessToken)
                 .build());
         try (var response = request.execute()) {
             if (response.isSuccessful()) {
@@ -153,7 +156,9 @@ public class GitPatchCache {
                     throw new IOException("Failed to retrieve file content from GitHub API. Response body is empty.");
                 }
             } else {
-                throw new IOException("Failed to retrieve file content from GitHub API. Status code: " + response.code());
+                throw new IOException("Failed to retrieve file content from GitHub API. Status code: " + response.code()
+                        + "\n request url" + response.request().url()
+                        + "\n Response body: " + (response.body() != null ? response.body().string() : "null"));
             }
         }
     }
