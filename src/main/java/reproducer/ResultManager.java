@@ -382,14 +382,14 @@ public class ResultManager {
                 }
             } catch (NotFoundException e) {
                 if (type.equals("jar")) {
-                    log.info("Could not find the old jar for breaking update {}. Searching for a pom instead...",
-                            bu.postCommit);
+                    log.info("Could not find the old jar of {} for breaking update {}. Searching for a pom instead...",
+                             oldDependencyLocation, bu.postCommit);
                 } else {
-                    log.error("Could not find the old jar or pom for breaking update {}", bu.postCommit);
+                    log.error("Could not find the old jar or pom of {} for breaking update {}", oldDependencyLocation, bu.postCommit);
                 }
                 continue;
             } catch (IOException e) {
-                log.error("Could not store the old {} for breaking update {}.", type, bu.postCommit, e);
+                log.error("Could not store the old {} for breaking update {} of {}.", type, bu.postCommit, oldDependencyLocation, e);
             }
 
             String newDependencyLocation = dependencyLocationBase + "%s/%s-%s.%s"
@@ -414,15 +414,15 @@ public class ResultManager {
                 }
             } catch (NotFoundException e) {
                 if (type.equals("jar")) {
-                    log.error("Could not find the new jar for breaking update {}, even if the old jar exists.",
-                            bu.postCommit);
+                    log.error("Could not find the new jar of {} for breaking update {}, even if the old jar exists.",
+                            newDependencyLocation, bu.postCommit);
                     return updateType;
                 } else {
-                    log.error("Could not find the new pom for breaking update {}, even if the old pom exists.",
-                            bu.postCommit);
+                    log.error("Could not find the new pom of {} for breaking update {}, even if the old pom exists.",
+                            newDependencyLocation, bu.postCommit);
                 }
             } catch (IOException e) {
-                log.error("Could not store the new {} for breaking update {}.", type, bu.postCommit, e);
+                log.error("Could not store the new {} for breaking update {} of {}.", type, bu.postCommit, newDependencyLocation, e);
             }
             return updateType;
         }
